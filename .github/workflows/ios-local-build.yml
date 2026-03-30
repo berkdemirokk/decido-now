@@ -1,0 +1,98 @@
+name: iOS Local Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - preview
+      submit_to_testflight:
+        description: Submit the built IPA to TestFlight
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    timeout-minutes: 120
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_ASC_KEY_ID: ${{ secrets.EXPO_ASC_KEY_ID }}
+      EXPO_ASC_ISSUER_ID: ${{ secrets.EXPO_ASC_ISSUER_ID }}
+      EXPO_APPLE_TEAM_ID: ${{ secrets.EXPO_APPLE_TEAM_ID }}
+      EXPO_APPLE_TEAM_TYPE: ${{ secrets.EXPO_APPLE_TEAM_TYPE }}
+      EAS_LOCAL_BUILD_SKIP_CLEANUP: 1
+      EAS_BUILD_NO_EXPO_GO_WARNING: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare ASC API key
+        if: ${{ secrets.EXPO_ASC_API_KEY_BASE64 != '' }}
+        shell: bash
+        run: |
+          mkdir -p /tmp/expo-asc
+          echo "${{ secrets.EXPO_ASC_API_KEY_BASE64 }}" | base64 --decode > /tmp/expo-asc/AuthKey.p8
+          echo "EXPO_ASC_API_KEY_PATH=/tmp/expo-asc/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Build local iOS IPA
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          npx eas build \
+            --platform ios \
+            --profile "${{ inputs.profile }}" \
+            --local \
+            --non-interactive \
+            --output "./artifacts/DecidoNow-${{ github.run_number }}.ipa"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DecidoNow-iOS-${{ github.run_number }}
+          path: artifacts/*.ipa
+          if-no-files-found: error
+
+      - name: Submit to TestFlight
+        if: ${{ inputs.submit_to_testflight }}
+        shell: bash
+        env:
+          EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          npx eas submit \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --path "./artifacts/DecidoNow-${{ github.run_number }}.ipa"
+
+      - name: Workflow summary
+        shell: bash
+        run: |
+          {
+            echo "## Decido Now iOS local build"
+            echo ""
+            echo "- Profile: \`${{ inputs.profile }}\`"
+            echo "- IPA artifact: \`artifacts/DecidoNow-${{ github.run_number }}.ipa\`"
+            echo "- Submitted to TestFlight: \`${{ inputs.submit_to_testflight }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

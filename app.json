@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Decido Now",
+    "slug": "karar10",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "decido",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f0d0c"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.berk.pick10",
+      "appStoreUrl": "https://apps.apple.com/app/id6761344452",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "8"
+    },
+    "android": {
+      "package": "com.berk.pick10",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f0d0c"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "billingMode": "storekit",
+      "subscriptionProductIds": {
+        "monthly": "decido.pro.monthly",
+        "yearly": "decido.pro.yearly"
+      },
+      "oneTimeProductIds": {
+        "founding": "decido.pro.founding"
+      },
+      "eas": {
+        "projectId": "337d9384-0b62-4f1b-a28a-434992d6d522"
+      }
+    },
+    "owner": "berkdemirok",
+    "plugins": [
+      "expo-iap",
+      "expo-notifications"
+    ]
+  }
+}
