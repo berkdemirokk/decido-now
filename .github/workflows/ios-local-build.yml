@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          npx eas build \
+          eas build \
             --platform ios \
             --profile "${{ inputs.profile }}" \
             --local \
@@ -83,7 +83,7 @@ jobs:
         env:
           EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
-          npx eas submit \
+          eas submit \
             --platform ios \
             --profile production \
             --non-interactive \
