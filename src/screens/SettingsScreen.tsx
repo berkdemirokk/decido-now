@@ -30,6 +30,7 @@ export function SettingsScreen({
   onLanguage,
   onGiftMove,
 }: SettingsScreenProps) {
+  const isTurkish = copy.tabs.today === 'Bugun';
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>{copy.settings.title}</Text>
@@ -38,8 +39,12 @@ export function SettingsScreen({
         <Text style={styles.primaryTitle}>{copy.settings.upgrade}</Text>
         <Text style={styles.primaryBody}>
           {plan === 'founding'
-            ? 'Gold badge active. Exclusive DNA layers and early-access systems are unlocked.'
-            : 'Unlimited moves, full focus runs, deeper DNA, and the full 7-day view.'}
+            ? isTurkish
+              ? 'Altin rozet aktif. Ozel DNA katmanlari ve erken erisim sistemleri acik.'
+              : 'Gold badge live. Exclusive DNA layers and early-access systems are open.'
+            : isTurkish
+              ? 'Sinirsiz execution, daha guclu toparlanma ve daha derin okuma acilir.'
+              : 'Unlock unlimited execution, stronger recovery, and deeper pattern reading.'}
         </Text>
       </Pressable>
 
@@ -63,9 +68,9 @@ export function SettingsScreen({
         </View>
       </View>
 
-      <SettingsRow label={copy.settings.gift} value="1 free unlock" onPress={onGiftMove} />
+      <SettingsRow label={copy.settings.gift} value={isTurkish ? '1 ucretsiz acilim' : '1 free unlock'} onPress={onGiftMove} />
       <SettingsRow label={copy.settings.restore} value="App Store" onPress={onRestore} />
-      <SettingsRow label={copy.settings.manage} value="Subscription" onPress={onManage} />
+      <SettingsRow label={copy.settings.manage} value={isTurkish ? 'Abonelik' : 'Subscription'} onPress={onManage} />
       <SettingsRow
         label={copy.settings.language}
         value={language.toUpperCase()}

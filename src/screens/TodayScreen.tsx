@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+﻿import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryMoveCard } from '../components/PrimaryMoveCard';
 import { UiCopy } from '../lib/uiCopy';
@@ -11,12 +11,30 @@ interface TodayScreenProps {
   contextLabel: string;
   personaTitle: string | null;
   personaAuditLine: string | null;
+  phaseLabel: string;
+  movesLeftLabel: string;
+  swapsLeftLabel: string;
+  premiumTease: string;
   reason: string;
   todayGain: string;
   tomorrowGain: string;
   tonightLine: string;
   streakLabel: string;
   levelLabel: string;
+  executionScore: number;
+  stabilityScore: number;
+  driftScore: number;
+  momentumTitle: string;
+  momentumBody: string;
+  lossLine: string | null;
+  returnPull: string;
+  recoveryPrompt: {
+    title: string;
+    body: string;
+    cta: string;
+    premiumProtected: boolean;
+    source?: 'abandon' | 'missed-day' | 'swap-fatigue';
+  } | null;
   streakSaverEligible: boolean;
   streakFreezeCredits: number;
   onStart: () => void;
@@ -24,6 +42,7 @@ interface TodayScreenProps {
   onSwap: () => void;
   onRefine: () => void;
   onShare: () => void;
+  onRecovery: () => void;
   onStreakSaver: () => void;
 }
 
@@ -33,12 +52,24 @@ export function TodayScreen({
   contextLabel,
   personaTitle,
   personaAuditLine,
+  phaseLabel,
+  movesLeftLabel,
+  swapsLeftLabel,
+  premiumTease,
   reason,
   todayGain,
   tomorrowGain,
   tonightLine,
   streakLabel,
   levelLabel,
+  executionScore,
+  stabilityScore,
+  driftScore,
+  momentumTitle,
+  momentumBody,
+  lossLine,
+  returnPull,
+  recoveryPrompt,
   streakSaverEligible,
   streakFreezeCredits,
   onStart,
@@ -46,37 +77,53 @@ export function TodayScreen({
   onSwap,
   onRefine,
   onShare,
+  onRecovery,
   onStreakSaver,
 }: TodayScreenProps) {
+  const isTurkish = copy.tabs.today === 'Bugun';
+
   if (!move) {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>{copy.today.noMove}</Text>
-        <Text style={styles.emptyBody}>{copy.today.title}</Text>
+        <Text style={styles.emptyBody}>{copy.today.usageHint}</Text>
       </View>
     );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.eyebrow}>{copy.today.eyebrow}</Text>
-      <Text style={styles.title}>{copy.today.title}</Text>
-      <View style={styles.contextRow}>
-        <View style={styles.contextPill}>
+      <View style={styles.heroBlock}>
+        <Text style={styles.eyebrow}>{copy.today.eyebrow}</Text>
+        <Text style={styles.title}>{copy.today.title}</Text>
+        <View style={styles.contextRow}>
           <Text style={styles.contextText}>{contextLabel}</Text>
+          {personaTitle ? (
+            <>
+              <Text style={styles.contextDivider}>/</Text>
+              <Text style={styles.contextText}>{personaTitle}</Text>
+            </>
+          ) : null}
         </View>
-        {personaTitle ? (
-          <View style={styles.contextPill}>
-            <Text style={styles.contextText}>{personaTitle}</Text>
-          </View>
-        ) : null}
+        {personaAuditLine ? <Text style={styles.auditLine}>{personaAuditLine}</Text> : null}
+        <View style={styles.stateRow}>
+          <StatePill label={phaseLabel} />
+          <StatePill label={movesLeftLabel} />
+          <StatePill label={swapsLeftLabel} />
+        </View>
       </View>
-      {personaAuditLine ? <Text style={styles.auditLine}>{personaAuditLine}</Text> : null}
+
       <PrimaryMoveCard
         move={move}
+        kickerLabel={copy.today.moveLabel}
         reason={reason}
         todayGain={todayGain}
         tomorrowGain={tomorrowGain}
+        commitLabel={copy.today.commitLabel}
+        commitBody={copy.today.commitBody}
+        whyLabel={copy.guidance.whyFits}
+        todayLabel={copy.today.todayGain}
+        tomorrowLabel={copy.today.tomorrowGain}
         streakLabel={streakLabel}
         levelLabel={levelLabel}
         primaryCta={copy.today.start}
@@ -90,20 +137,98 @@ export function TodayScreen({
         onRefine={onRefine}
         onShare={onShare}
       />
-      <View style={styles.tonight}>
-        <Text style={styles.tonightLabel}>{copy.today.tonight}</Text>
-        <Text style={styles.tonightBody}>{tonightLine}</Text>
+
+      <View style={styles.signalGrid}>
+        <View style={styles.signalCardPrimary}>
+          <Text style={styles.signalLabel}>{isTurkish ? 'MOMENTUM' : 'MOMENTUM'}</Text>
+          <Text style={styles.signalTitle}>{momentumTitle}</Text>
+          <Text style={styles.signalBody}>{momentumBody}</Text>
+          <View style={styles.metricRow}>
+            <ControlMetric label="EXE" value={executionScore} tone="strong" />
+            <ControlMetric
+              label={isTurkish ? 'IST' : 'STB'}
+              value={stabilityScore}
+            />
+            <ControlMetric label="DRF" value={driftScore} tone="danger" />
+          </View>
+          {lossLine ? <Text style={styles.lossLine}>{lossLine}</Text> : null}
+        </View>
+
+        <View style={styles.signalCard}>
+          <Text style={styles.signalLabel}>{copy.today.tonight}</Text>
+          <Text style={styles.signalBody}>{tonightLine}</Text>
+          <Text style={styles.returnPull}>{returnPull}</Text>
+          <Text style={styles.usageHint}>{premiumTease}</Text>
+        </View>
       </View>
-      {streakSaverEligible ? (
-        <Pressable style={styles.saverCard} onPress={onStreakSaver}>
-          <Text style={styles.saverLabel}>STREAK SAVER</Text>
-          <Text style={styles.saverTitle}>Save your momentum with a 2-minute reset.</Text>
-          <Text style={styles.saverBody}>
-            {streakFreezeCredits} freeze credit ready. Run the quick reset before tonight.
+
+      {recoveryPrompt ? (
+        <Pressable style={styles.recoveryCard} onPress={onRecovery}>
+          <Text style={styles.recoveryLabel}>
+            {recoveryPrompt.source === 'swap-fatigue'
+              ? isTurkish
+                ? 'KARAR RESETI'
+                : 'DECISION RESET'
+              : isTurkish
+                ? 'HIZLI TOPARLANMA'
+                : 'QUICK RECOVERY'}
+          </Text>
+          <Text style={styles.recoveryTitle}>{recoveryPrompt.title}</Text>
+          <Text style={styles.recoveryBody}>{recoveryPrompt.body}</Text>
+          <Text style={styles.recoveryCta}>
+            {recoveryPrompt.cta}
+            {recoveryPrompt.premiumProtected
+              ? isTurkish
+                ? ' (Seri koruma hazir)'
+                : ' (Streak protection ready)'
+              : ''}
           </Text>
         </Pressable>
       ) : null}
+
+      {streakSaverEligible ? (
+        <Pressable style={styles.saverCard} onPress={onStreakSaver}>
+          <Text style={styles.saverLabel}>{isTurkish ? 'SERI KORUMA' : 'STREAK SAVER'}</Text>
+          <Text style={styles.saverTitle}>
+            {isTurkish ? 'Bugunu kaybetme.' : 'Do not lose the day.'}
+          </Text>
+          <Text style={styles.saverBody}>{copy.helpers.streakSaverBody(streakFreezeCredits)}</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
+  );
+}
+
+function StatePill({ label }: { label: string }) {
+  return (
+    <View style={styles.statePill}>
+      <Text style={styles.statePillText}>{label}</Text>
+    </View>
+  );
+}
+
+function ControlMetric({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string;
+  value: number;
+  tone?: 'default' | 'strong' | 'danger';
+}) {
+  return (
+    <View style={styles.metricChip}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.metricValue,
+          tone === 'strong' ? styles.metricValueStrong : null,
+          tone === 'danger' ? styles.metricValueDanger : null,
+        ]}
+      >
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -112,45 +237,79 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     gap: theme.spacing.lg,
     paddingBottom: 140,
+    flexGrow: 1,
+  },
+  heroBlock: {
+    gap: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
   },
   eyebrow: {
     color: theme.colors.accent,
     fontSize: theme.typography.meta,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 1.6,
   },
   title: {
     color: theme.colors.text,
     fontSize: theme.typography.display,
     fontWeight: '700',
-    lineHeight: 40,
+    lineHeight: 46,
+    letterSpacing: -1,
   },
   contextRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  contextPill: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 8,
-    borderRadius: theme.radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    alignItems: 'center',
+    gap: 8,
   },
   contextText: {
     color: theme.colors.textSoft,
     fontSize: theme.typography.meta,
     fontWeight: '700',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+  contextDivider: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.meta,
+    opacity: 0.5,
   },
   auditLine: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
-    lineHeight: 22,
+    lineHeight: 23,
   },
-  tonight: {
+  stateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statePill: {
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  statePillText: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.meta,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  signalGrid: {
+    gap: theme.spacing.sm,
+  },
+  signalCardPrimary: {
+    backgroundColor: theme.colors.surfaceAlt,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  signalCard: {
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
@@ -158,22 +317,103 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     gap: theme.spacing.sm,
   },
-  tonightLabel: {
+  signalLabel: {
     color: theme.colors.textSoft,
     fontSize: theme.typography.meta,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 1.1,
   },
-  tonightBody: {
+  signalTitle: {
+    color: theme.colors.text,
+    fontSize: theme.typography.h2,
+    fontWeight: '700',
+  },
+  signalBody: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
     lineHeight: 22,
   },
-  saverCard: {
-    backgroundColor: 'rgba(245,158,11,0.12)',
+  metricRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  metricChip: {
+    flex: 1,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    gap: 4,
+  },
+  metricLabel: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.meta,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  metricValue: {
+    color: theme.colors.text,
+    fontSize: theme.typography.h2,
+    fontWeight: '800',
+  },
+  metricValueStrong: {
+    color: theme.colors.accent,
+  },
+  metricValueDanger: {
+    color: theme.colors.danger,
+  },
+  lossLine: {
+    color: theme.colors.danger,
+    fontSize: theme.typography.body,
+    lineHeight: 22,
+    fontWeight: '600',
+  },
+  returnPull: {
+    color: theme.colors.text,
+    fontSize: theme.typography.body,
+    lineHeight: 22,
+    fontWeight: '600',
+  },
+  usageHint: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.body,
+    lineHeight: 22,
+  },
+  recoveryCard: {
+    backgroundColor: theme.colors.surfaceAlt,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.28)',
+    borderColor: theme.colors.borderStrong,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  recoveryLabel: {
+    color: theme.colors.accent,
+    fontSize: theme.typography.meta,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+  },
+  recoveryTitle: {
+    color: theme.colors.text,
+    fontSize: theme.typography.h2,
+    fontWeight: '700',
+  },
+  recoveryBody: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.body,
+    lineHeight: 22,
+  },
+  recoveryCta: {
+    color: theme.colors.text,
+    fontSize: theme.typography.body,
+    fontWeight: '700',
+  },
+  saverCard: {
+    backgroundColor: 'rgba(212,162,76,0.08)',
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(212,162,76,0.24)',
     padding: theme.spacing.lg,
     gap: theme.spacing.sm,
   },
@@ -207,5 +447,7 @@ const styles = StyleSheet.create({
   emptyBody: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
+    lineHeight: 22,
   },
 });
+

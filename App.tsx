@@ -23,6 +23,9 @@ export default function App() {
   const app = useDecidoApp();
   const shellOpacity = useSharedValue(1);
 
+  const shareHeadline = app.copy.helpers.shareHeadline(app.shareVariant);
+  const shareResult = app.copy.helpers.shareResult(app.shareVariant);
+
   useEffect(() => {
     shellOpacity.value = withTiming(app.focusRunView.visible ? 0 : 1, {
       duration: app.focusRunView.visible ? 180 : 220,
@@ -62,14 +65,21 @@ export default function App() {
             onMinutes={app.setOnboardingMinutes}
             onEnergy={app.setOnboardingEnergy}
             onContinue={() => {
+              app.trackCtaTap('onboarding', 'continue', { step: app.onboardingStep });
               if (app.onboardingStep === 0 && !app.onboardingGoal) return;
               if (app.onboardingStep === 1 && !app.onboardingFriction) return;
               if (app.onboardingStep === 2 && !app.onboardingMinutes) return;
               if (app.onboardingStep === 3 && !app.onboardingEnergy) return;
               app.setOnboardingStep((current) => Math.min(current + 1, 4));
             }}
-            onStart={() => app.completeOnboarding(true, false)}
-            onWhy={() => app.completeOnboarding(false, true)}
+            onStart={() => {
+              app.trackCtaTap('onboarding', 'take_move');
+              app.completeOnboarding(true, false);
+            }}
+            onWhy={() => {
+              app.trackCtaTap('onboarding', 'see_reasoning');
+              app.completeOnboarding(false, true);
+            }}
           />
         </LinearGradient>
       </SafeAreaView>
@@ -91,20 +101,54 @@ export default function App() {
                   contextLabel={app.contextWindowLabel}
                   personaTitle={app.personaTitle}
                   personaAuditLine={app.personaAuditLine}
+                  phaseLabel={app.phaseLabel}
+                  movesLeftLabel={app.movesLeftLabel}
+                  swapsLeftLabel={app.swapsLeftLabel}
+                  premiumTease={app.premiumTease}
                   reason={app.guidance?.whyFits ?? ''}
                   todayGain={app.todayGain}
                   tomorrowGain={app.tomorrowGain}
                   tonightLine={app.tonightLine}
                   streakLabel={`${app.streak} ${app.copy.states.streak}`}
                   levelLabel={`${app.rewardProfile.level}`}
-                  onStart={app.startFocusRun}
-                  onWhy={() => app.setGuidanceVisible(true)}
-                  onSwap={app.swapMove}
-                  onRefine={() => app.setTab('systems')}
-                  onShare={() => app.openShare()}
+                  executionScore={app.behaviorProfile.executionScore}
+                  stabilityScore={app.behaviorProfile.stabilityScore}
+                  driftScore={app.behaviorProfile.driftScore}
+                  momentumTitle={app.behaviorProfile.momentumTitle}
+                  momentumBody={app.behaviorProfile.momentumBody}
+                  lossLine={app.behaviorProfile.lossLine}
+                  returnPull={app.behaviorProfile.returnPull}
+                  recoveryPrompt={app.recoveryPrompt}
+                  onStart={() => {
+                    app.trackCtaTap('today', 'start_now', { system: app.appData.currentSystem });
+                    app.startFocusRun();
+                  }}
+                  onWhy={() => {
+                    app.trackCtaTap('today', 'why_this_move', { system: app.appData.currentSystem });
+                    app.setGuidanceVisible(true);
+                  }}
+                  onSwap={() => {
+                    app.trackCtaTap('today', 'try_another', { system: app.appData.currentSystem });
+                    app.swapMove();
+                  }}
+                  onRefine={() => {
+                    app.trackCtaTap('today', 'tune_system');
+                    app.setTab('systems');
+                  }}
+                  onShare={() => {
+                    app.trackCtaTap('today', 'share_move');
+                    app.openShare();
+                  }}
+                  onRecovery={() => {
+                    app.trackCtaTap('today', 'recovery_move', { source: app.recoveryPrompt?.source ?? 'abandon' });
+                    app.startRecoveryMove(app.recoveryPrompt?.source ?? 'abandon');
+                  }}
                   streakSaverEligible={app.streakSaverEligible}
                   streakFreezeCredits={app.streakFreezeCredits}
-                  onStreakSaver={app.startStreakSaverReset}
+                  onStreakSaver={() => {
+                    app.trackCtaTap('today', 'streak_saver');
+                    app.startStreakSaverReset();
+                  }}
                 />
               </View>
             ) : null}
@@ -132,7 +176,9 @@ export default function App() {
                 pending={app.pending}
                 recent={app.recent}
                 analyticsSummary={app.analyticsSummary}
-                onPaywall={() => app.setPaywallVisible(true)}
+                progressSummary={app.progressSummary}
+                behaviorProfile={app.behaviorProfile}
+                onPaywall={() => app.openPaywall('hard-access', 'progress-insight')}
                 onShare={app.openShare}
               />
             ) : null}
@@ -144,7 +190,7 @@ export default function App() {
                 plan={app.appData.subscription.plan}
                 currentSystem={app.appData.currentSystem}
                 currentMoveTitle={app.currentMoveTitle}
-                onOpenPaywall={() => app.setPaywallVisible(true)}
+                onOpenPaywall={() => app.openPaywall('soft-success', 'settings-upgrade')}
                 onRestore={app.restoreMockPurchase}
                 onManage={app.manageSubscription}
                 onLanguage={app.toggleLanguage}
@@ -174,23 +220,50 @@ export default function App() {
         title={app.selectedMove?.title ?? app.copy.guidance.title}
         guidance={app.guidance}
         projection={app.projection}
+        guidanceTier={app.entitlements.guidanceTier}
         lockedProjection={app.appData.subscription.plan === 'free'}
-        onClose={() => app.setGuidanceVisible(false)}
+        onClose={() => {
+          app.trackCtaTap('guidance', 'close');
+          app.setGuidanceVisible(false);
+        }}
         onStart={() => {
+          app.trackCtaTap('guidance', 'run_this_move', { tier: app.entitlements.guidanceTier });
           app.setGuidanceVisible(false);
           app.startFocusRun(true);
+        }}
+        onUpgrade={() => {
+          app.trackCtaTap('guidance', 'unlock_full_guidance');
+          app.openPaywall('hard-access', 'guidance-depth');
         }}
       />
 
       <FocusRunScreen
         copy={app.copy}
         state={app.focusRunView}
-        onStart={app.beginFocusRun}
-        onNext={app.nextFocusStep}
-        onMakeEasier={app.makeFocusRunEasier}
-        onAskLeave={app.askLeaveFocusRun}
-        onResume={app.resumeFocusRun}
-        onLeaveAnyway={app.leaveFocusRunAnyway}
+        onStart={() => {
+          app.trackCtaTap('focus_run', 'lock_it_in');
+          app.beginFocusRun();
+        }}
+        onNext={() => {
+          app.trackCtaTap('focus_run', 'next_step');
+          app.nextFocusStep();
+        }}
+        onMakeEasier={() => {
+          app.trackCtaTap('focus_run', 'trim_it_down');
+          app.makeFocusRunEasier();
+        }}
+        onAskLeave={() => {
+          app.trackCtaTap('focus_run', 'exit_run');
+          app.askLeaveFocusRun();
+        }}
+        onResume={() => {
+          app.trackCtaTap('focus_run', 'stay_in');
+          app.resumeFocusRun();
+        }}
+        onLeaveAnyway={() => {
+          app.trackCtaTap('focus_run', 'leave_anyway');
+          app.leaveFocusRunAnyway();
+        }}
         onScore={app.scoreFocusRun}
       />
 
@@ -199,7 +272,11 @@ export default function App() {
         xpGain={app.reward?.xpGain ?? 0}
         levelBefore={app.reward?.levelBefore ?? app.rewardProfile.level}
         levelAfter={app.reward?.levelAfter ?? app.rewardProfile.level}
+        title={app.copy.reward.momentumTitle}
         message={app.reward?.message ?? app.copy.reward.momentumSaved}
+        detail={
+          app.behaviorProfile.returnPull
+        }
         buttonLabel={app.copy.reward.continue}
         onContinue={app.closeReward}
       />
@@ -207,15 +284,32 @@ export default function App() {
       <PaywallScreen
         visible={app.paywallVisible}
         copy={app.copy}
+        mode={app.paywallMode}
+        body={app.paywallBody}
         prices={app.paywallPriceLabels}
         storeConnected={app.storeConnected}
         storeCatalogLoaded={app.storeCatalogLoaded}
         storeError={app.storeError}
-        onAnnual={() => app.mockPurchase('pro-yearly')}
-        onMonthly={() => app.mockPurchase('pro-monthly')}
-        onFounding={() => app.mockPurchase('founding')}
-        onRestore={app.restoreMockPurchase}
-        onClose={() => app.setPaywallVisible(false)}
+        onAnnual={() => {
+          app.trackCtaTap('paywall', 'start_yearly_trial', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });
+          app.mockPurchase('pro-yearly');
+        }}
+        onMonthly={() => {
+          app.trackCtaTap('paywall', 'choose_monthly', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });
+          app.mockPurchase('pro-monthly');
+        }}
+        onFounding={() => {
+          app.trackCtaTap('paywall', 'choose_founding', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });
+          app.mockPurchase('founding');
+        }}
+        onRestore={() => {
+          app.trackCtaTap('paywall', 'restore');
+          app.restoreMockPurchase();
+        }}
+        onClose={() => {
+          app.trackCtaTap('paywall', 'continue_free', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });
+          app.setPaywallVisible(false);
+        }}
       />
 
       <Modal
@@ -227,27 +321,32 @@ export default function App() {
         <View style={styles.shareBackdrop}>
           <View style={styles.shareSheet}>
             <ShareCard
-              headline={
-                app.shareRecord?.completion === 'done'
-                  ? "TODAY'S MOVE COMPLETED"
-                  : "TODAY'S SMART MOVE"
-              }
+              variant={app.shareVariant}
+              headline={shareHeadline}
               moveTitle={app.shareRecord?.selectedSuggestion.title ?? ''}
-              resultLine={
-                app.shareRecord?.completion === 'done'
-                  ? 'I completed my move today and kept momentum alive.'
-                  : 'One smart move for today.'
-              }
+              resultLine={shareResult}
               streakLine={`${app.streak} ${app.copy.states.streak}`}
               personaLine={app.sharePersonaLabel}
               badge={app.appData.subscription.plan === 'founding' ? 'FOUNDING' : null}
               deepLink={app.shareGiftPreview?.deepLink ?? null}
             />
             <View style={styles.shareActions}>
-              <Pressable onPress={app.performShare} style={styles.sharePrimary}>
+              <Pressable
+                onPress={() => {
+                  app.trackCtaTap('share', 'share_card', { variant: app.shareVariant });
+                  app.performShare();
+                }}
+                style={styles.sharePrimary}
+              >
                 <Text style={styles.sharePrimaryText}>{app.copy.today.share}</Text>
               </Pressable>
-              <Pressable onPress={() => app.setShareRecord(null)} style={styles.shareSecondary}>
+              <Pressable
+                onPress={() => {
+                  app.trackCtaTap('share', 'close');
+                  app.setShareRecord(null);
+                }}
+                style={styles.shareSecondary}
+              >
                 <Text style={styles.shareSecondaryText}>{app.copy.guidance.close}</Text>
               </Pressable>
             </View>

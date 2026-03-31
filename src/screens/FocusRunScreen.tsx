@@ -1,7 +1,12 @@
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { LiveActivityMock } from '../components/LiveActivityMock';
 import { UiCopy } from '../lib/uiCopy';
@@ -43,6 +48,7 @@ export function FocusRunScreen({
   onLeaveAnyway,
   onScore,
 }: FocusRunScreenProps) {
+  const isTurkish = copy.tabs.today === 'Bugun';
   const entry = useSharedValue(0);
 
   useEffect(() => {
@@ -66,18 +72,63 @@ export function FocusRunScreen({
     state.phase === 'prestart'
       ? state.move.title
       : state.steps[state.currentStep] ?? state.move.action;
+  const statusTone =
+    state.easyMode || state.move.id.startsWith('reset-')
+      ? copy.focusRun.recoveryLine
+      : state.phase === 'prestart'
+        ? copy.focusRun.prestartLine
+        : copy.focusRun.activeLine;
 
   return (
     <Modal animationType="slide" presentationStyle="fullScreen" visible={state.visible}>
       <Animated.View style={[styles.container, animatedStyle]}>
         <StatusBar hidden />
-        <Text style={styles.eyebrow}>{copy.focusRun.title.toUpperCase()}</Text>
-        <Text style={styles.title}>{state.move.title}</Text>
-        <LiveActivityMock
-          stepName={currentStepName}
-          progress={progress}
-          timeRemaining={formatTimer(state.secondsLeft)}
-        />
+
+        <View style={styles.chromeFade} />
+
+        <View style={styles.topBlock}>
+          <Text style={styles.eyebrow}>{copy.focusRun.title.toUpperCase()}</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.statusPill}>
+              <Text style={styles.statusPillText}>
+                {state.phase === 'prestart'
+                  ? isTurkish
+                    ? 'KILIT ONCESI'
+                    : 'PRE-COMMIT'
+                  : state.phase === 'score'
+                    ? isTurkish
+                      ? 'KAPANIS'
+                      : 'CLOSEOUT'
+                    : isTurkish
+                      ? 'RUN CANLI'
+                      : 'RUN LIVE'}
+              </Text>
+            </View>
+            <Text style={styles.windowText}>
+              {state.easyMode
+                ? isTurkish
+                  ? '2 DAKIKALIK KURTARMA'
+                  : '2-MINUTE SAVE'
+                : isTurkish
+                  ? 'BUGUNUN KAPANISI'
+                  : "TODAY'S CLOSE"}
+            </Text>
+          </View>
+          <Text style={styles.title}>{state.move.title}</Text>
+          <Text style={styles.commitLine}>{statusTone}</Text>
+          {state.phase === 'prestart' ? (
+            <Text style={styles.lockLine}>{copy.focusRun.lockLine}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.liveShell}>
+          <LiveActivityMock
+            stepName={currentStepName}
+            progress={progress}
+            timeRemaining={formatTimer(state.secondsLeft)}
+          />
+        </View>
+
         <View style={styles.timerShell}>
           <Text style={styles.timerLabel}>
             {state.phase === 'halfway'
@@ -86,7 +137,9 @@ export function FocusRunScreen({
                 ? copy.focusRun.nearFinish
                 : state.easyMode
                   ? copy.focusRun.makeEasier
-                  : 'STAY WITH THIS ONE MOVE'}
+                  : isTurkish
+                    ? 'HAMLE CANLI'
+                    : 'MOVE LIVE'}
           </Text>
           <Text style={styles.timerValue}>{formatTimer(state.secondsLeft)}</Text>
           <View style={styles.progressBar}>
@@ -96,7 +149,12 @@ export function FocusRunScreen({
 
         {state.phase === 'prestart' ? (
           <View style={styles.prestart}>
-            <Text style={styles.stepText}>{state.move.action}</Text>
+            <View style={styles.commitCard}>
+              <Text style={styles.commitCardLabel}>
+                {isTurkish ? 'SIMDI YAPACAGIN' : 'YOUR NEXT ACTION'}
+              </Text>
+              <Text style={styles.stepText}>{state.move.action}</Text>
+            </View>
             <Pressable onPress={onStart} style={styles.primaryButton}>
               <Text style={styles.primaryText}>{copy.focusRun.start}</Text>
             </Pressable>
@@ -111,7 +169,11 @@ export function FocusRunScreen({
             <Text style={styles.scorePrompt}>{copy.focusRun.scorePrompt}</Text>
             <View style={styles.scoreRow}>
               {[1, 2, 3, 4, 5].map((score) => (
-                <Pressable key={score} onPress={() => onScore(score as 1 | 2 | 3 | 4 | 5)} style={styles.scoreChip}>
+                <Pressable
+                  key={score}
+                  onPress={() => onScore(score as 1 | 2 | 3 | 4 | 5)}
+                  style={styles.scoreChip}
+                >
                   <Text style={styles.scoreChipText}>{score}</Text>
                 </Pressable>
               ))}
@@ -120,7 +182,8 @@ export function FocusRunScreen({
         ) : (
           <View style={styles.activeState}>
             <Text style={styles.stepLabel}>
-              STEP {Math.min(state.currentStep + 1, state.steps.length)} OF {state.steps.length}
+              {isTurkish ? 'ADIM' : 'STEP'} {Math.min(state.currentStep + 1, state.steps.length)}{' '}
+              {isTurkish ? '/' : 'OF'} {state.steps.length}
             </Text>
             <Text style={styles.stepText}>{state.steps[state.currentStep] ?? state.move.action}</Text>
             <View style={styles.actionRow}>
@@ -129,7 +192,9 @@ export function FocusRunScreen({
               </Pressable>
               <Pressable onPress={onNext} style={styles.primaryButtonCompact}>
                 <Text style={styles.primaryText}>
-                  {state.currentStep >= state.steps.length - 1 ? copy.focusRun.finish : copy.focusRun.next}
+                  {state.currentStep >= state.steps.length - 1
+                    ? copy.focusRun.finish
+                    : copy.focusRun.next}
                 </Text>
               </Pressable>
             </View>
@@ -139,6 +204,8 @@ export function FocusRunScreen({
         {state.phase === 'leaveConfirm' ? (
           <View style={styles.leaveCard}>
             <Text style={styles.leaveTitle}>{copy.focusRun.leaveTitle}</Text>
+            <Text style={styles.leaveBody}>{copy.focusRun.leaveBody}</Text>
+            <Text style={styles.leaveHint}>{copy.focusRun.partialFollowUp}</Text>
             <View style={styles.leaveActions}>
               <Pressable onPress={onResume} style={styles.secondaryButton}>
                 <Text style={styles.secondaryText}>{copy.focusRun.resume}</Text>
@@ -170,9 +237,20 @@ function formatTimer(totalSeconds: number) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#010101',
     padding: theme.spacing.xl,
     justifyContent: 'space-between',
+  },
+  chromeFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 180,
+    backgroundColor: 'rgba(212,162,76,0.03)',
+  },
+  topBlock: {
+    gap: theme.spacing.sm,
   },
   eyebrow: {
     color: theme.colors.accent,
@@ -180,19 +258,65 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.4,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  statusPill: {
+    alignSelf: 'flex-start',
+    borderRadius: theme.radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+  },
+  statusPillText: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.meta,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  windowText: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.meta,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
   title: {
     color: theme.colors.text,
     fontSize: theme.typography.display,
     lineHeight: 40,
     fontWeight: '700',
   },
+  commitLine: {
+    color: theme.colors.text,
+    fontSize: theme.typography.body,
+    lineHeight: 23,
+    fontWeight: '600',
+  },
+  lockLine: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.body,
+    lineHeight: 22,
+  },
+  liveShell: {
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceAlt,
+    padding: 2,
+  },
   timerShell: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.borderStrong,
     padding: theme.spacing.xl,
     gap: theme.spacing.md,
+    ...theme.shadow.gold,
   },
   timerLabel: {
     color: theme.colors.textSoft,
@@ -202,7 +326,7 @@ const styles = StyleSheet.create({
   },
   timerValue: {
     color: theme.colors.text,
-    fontSize: 52,
+    fontSize: 54,
     fontWeight: '800',
   },
   progressBar: {
@@ -217,6 +341,20 @@ const styles = StyleSheet.create({
   },
   prestart: {
     gap: theme.spacing.md,
+  },
+  commitCard: {
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  commitCardLabel: {
+    color: theme.colors.accent,
+    fontSize: theme.typography.meta,
+    fontWeight: '800',
+    letterSpacing: 1.1,
   },
   activeState: {
     gap: theme.spacing.lg,
@@ -242,6 +380,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
     paddingVertical: 18,
     alignItems: 'center',
+    ...theme.shadow.gold,
   },
   primaryButtonCompact: {
     flex: 1,
@@ -249,17 +388,19 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
     paddingVertical: 16,
     alignItems: 'center',
+    ...theme.shadow.gold,
   },
   primaryText: {
-    color: '#1b1202',
+    color: '#120b03',
     fontSize: theme.typography.body,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   secondaryButton: {
     flex: 1,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceAlt,
     paddingVertical: 16,
     alignItems: 'center',
   },
@@ -293,11 +434,11 @@ const styles = StyleSheet.create({
   scoreChip: {
     flex: 1,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
-    paddingVertical: 14,
+    backgroundColor: theme.colors.surfaceAlt,
     alignItems: 'center',
+    paddingVertical: 16,
   },
   scoreChipText: {
     color: theme.colors.text,
@@ -305,16 +446,26 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   leaveCard: {
-    backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.surfaceAlt,
     padding: theme.spacing.lg,
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   leaveTitle: {
     color: theme.colors.text,
     fontSize: theme.typography.h2,
+    fontWeight: '700',
+  },
+  leaveBody: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.body,
+    lineHeight: 22,
+  },
+  leaveHint: {
+    color: theme.colors.accent,
+    fontSize: theme.typography.body,
     fontWeight: '700',
   },
   leaveActions: {
@@ -322,13 +473,15 @@ const styles = StyleSheet.create({
   },
   leaveDanger: {
     borderRadius: theme.radius.md,
-    backgroundColor: 'rgba(251,113,133,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(234,124,143,0.28)',
+    backgroundColor: 'rgba(234,124,143,0.08)',
     paddingVertical: 16,
     alignItems: 'center',
   },
   leaveDangerText: {
     color: theme.colors.danger,
     fontSize: theme.typography.body,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

@@ -22,31 +22,52 @@ interface OnboardingScreenProps {
   onWhy: () => void;
 }
 
-const goals: Array<{ value: Goal; label: string }> = [
-  { value: 'finish', label: 'Clarity' },
-  { value: 'learn', label: 'Learning' },
-  { value: 'earn', label: 'Money' },
-  { value: 'reset', label: 'Calm' },
-  { value: 'build', label: 'Progress' },
-];
-
-const frictions: Array<{ value: Friction; label: string }> = [
-  { value: 'unclear', label: 'Unclear' },
-  { value: 'distracted', label: 'Distracted' },
-  { value: 'tired', label: 'Tired' },
-  { value: 'anxious', label: 'Anxious' },
-  { value: 'avoidant', label: 'Avoiding' },
-];
-
 const times = [3, 10, 20];
-const energies: Array<{ value: Energy; label: string }> = [
-  { value: 'low', label: 'Low' },
-  { value: 'mid', label: 'Medium' },
-  { value: 'high', label: 'High' },
-];
 
 export function OnboardingScreen(props: OnboardingScreenProps) {
   const { copy, step } = props;
+  const isTurkish = copy.tabs.today === 'Bugun';
+  const goals: Array<{ value: Goal; label: string }> = isTurkish
+    ? [
+        { value: 'finish', label: 'Netlik' },
+        { value: 'learn', label: 'Ogrenme' },
+        { value: 'earn', label: 'Para' },
+        { value: 'reset', label: 'Sakinlik' },
+        { value: 'build', label: 'Ilerleme' },
+      ]
+    : [
+        { value: 'finish', label: 'Clarity' },
+        { value: 'learn', label: 'Learning' },
+        { value: 'earn', label: 'Money' },
+        { value: 'reset', label: 'Calm' },
+        { value: 'build', label: 'Progress' },
+      ];
+  const frictions: Array<{ value: Friction; label: string }> = isTurkish
+    ? [
+        { value: 'unclear', label: 'Belirsiz' },
+        { value: 'distracted', label: 'Daginik' },
+        { value: 'tired', label: 'Yorgun' },
+        { value: 'anxious', label: 'Kaygili' },
+        { value: 'avoidant', label: 'Kaciniyorum' },
+      ]
+    : [
+        { value: 'unclear', label: 'Unclear' },
+        { value: 'distracted', label: 'Distracted' },
+        { value: 'tired', label: 'Tired' },
+        { value: 'anxious', label: 'Anxious' },
+        { value: 'avoidant', label: 'Avoiding' },
+      ];
+  const energies: Array<{ value: Energy; label: string }> = isTurkish
+    ? [
+        { value: 'low', label: 'Dusuk' },
+        { value: 'mid', label: 'Orta' },
+        { value: 'high', label: 'Yuksek' },
+      ]
+    : [
+        { value: 'low', label: 'Low' },
+        { value: 'mid', label: 'Medium' },
+        { value: 'high', label: 'High' },
+      ];
 
   const renderQuestion = () => {
     if (step === 0) {
@@ -103,15 +124,17 @@ export function OnboardingScreen(props: OnboardingScreenProps) {
 
     return (
       <View style={styles.reveal}>
-        <Text style={styles.revealEyebrow}>READY</Text>
+        <Text style={styles.revealEyebrow}>{isTurkish ? 'ILK HAMLE' : 'FIRST MOVE'}</Text>
         <Text style={styles.revealTitle}>{copy.onboarding.reveal}</Text>
         <Text style={styles.revealBody}>{copy.onboarding.revealBody}</Text>
         <View style={styles.previewCard}>
           <Text style={styles.previewTitle}>{props.previewTitle}</Text>
           <BlurView intensity={78} tint="dark" style={styles.proPreview}>
-            <Text style={styles.proPreviewLabel}>PRO PREVIEW</Text>
+            <Text style={styles.proPreviewLabel}>{isTurkish ? 'ILK 3 GUN' : 'FIRST 3 DAYS'}</Text>
             <Text style={styles.proPreviewText}>
-              7-day projection, deeper DNA, and a sharper action map unlock after your first wins.
+              {isTurkish
+                ? 'Ilk 3 gun daha fazla alan acilir. Sistem once ritmini gorur, sonra hamleleri sertlestirir.'
+                : 'Your first 3 days are more generous. The system reads your rhythm first, then sharpens the moves.'}
             </Text>
           </BlurView>
         </View>
@@ -132,6 +155,11 @@ export function OnboardingScreen(props: OnboardingScreenProps) {
       <Text style={styles.brand}>DECIDO NOW</Text>
       <Text style={styles.title}>{copy.onboarding.title}</Text>
       <Text style={styles.body}>{copy.onboarding.body}</Text>
+      <Text style={styles.subBody}>
+        {isTurkish
+          ? 'Burasi daha fazla liste cikarmak icin degil. Az sayida net hamleyle seni harekete sokmak icin var.'
+          : 'This is not here to create more lists. It is here to get you moving with a small number of sharp actions.'}
+      </Text>
       {renderQuestion()}
       {step < 4 ? (
         <Pressable onPress={props.onContinue} style={styles.primaryButton}>
@@ -190,9 +218,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   body: {
-    color: theme.colors.textMuted,
+    color: theme.colors.text,
     fontSize: theme.typography.body,
     lineHeight: 24,
+    fontWeight: '600',
+  },
+  subBody: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.body,
+    lineHeight: 22,
   },
   questionBlock: {
     gap: theme.spacing.md,
@@ -253,6 +287,7 @@ const styles = StyleSheet.create({
   revealBody: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
+    lineHeight: 22,
   },
   previewCard: {
     backgroundColor: theme.colors.surface,

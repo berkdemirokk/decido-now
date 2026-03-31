@@ -1,9 +1,4 @@
-export type Mode =
-  | 'stuck'
-  | 'quick-win'
-  | 'deep-focus'
-  | 'reset'
-  | 'bold';
+export type Mode = 'stuck' | 'quick-win' | 'deep-focus' | 'reset' | 'bold';
 
 export type Energy = 'low' | 'mid' | 'high';
 
@@ -27,6 +22,8 @@ export type Category =
 export type CategoryFilter = Category | 'mixed';
 
 export type CompletionState = 'done' | 'partial' | 'skipped';
+
+export type FocusRunOutcome = 'completed' | 'partial' | 'abandoned';
 
 export type PlanTier = 'free' | 'pro-monthly' | 'pro-yearly' | 'founding';
 
@@ -55,6 +52,14 @@ export type SupportedLanguage =
   | 'fi'
   | 'ro'
   | 'cs';
+
+export type NotificationPermissionState = 'unknown' | 'granted' | 'denied';
+
+export type GuidanceTier = 'basic' | 'full';
+
+export type RecoveryTier = 'basic' | 'advanced';
+
+export type PaywallMode = 'soft-success' | 'hard-access';
 
 export interface DecisionContext {
   mode: Mode;
@@ -93,6 +98,9 @@ export interface DecisionRecord {
   reviewedAt: string | null;
   executionSeconds?: number | null;
   usedGuidance?: boolean;
+  isRecoveryMove?: boolean;
+  swapCountBeforeSelection?: number;
+  focusRunOutcome?: FocusRunOutcome | null;
 }
 
 export interface SkipLedger {
@@ -109,16 +117,29 @@ export interface SubscriptionState {
 }
 
 export interface NotificationState {
-  permission: 'unknown' | 'granted' | 'denied';
+  permission: NotificationPermissionState;
+  lastPermissionRequestedAt: string | null;
+  lastPermissionResolvedAt: string | null;
   lastRecallMoveId: string | null;
   lastRecallAt: string | null;
+  lastRecallNotificationId: string | null;
   lastStreakSaverDateKey: string | null;
+  lastStreakSaverScheduledAt: string | null;
+  lastStreakSaverNotificationId: string | null;
+  lastRecoveryDateKey: string | null;
+  lastRecoveryScheduledAt: string | null;
+  lastRecoveryNotificationId: string | null;
 }
 
 export interface DailyUsage {
   dateKey: string;
+  movesUsed: number;
   swapsUsed: number;
+  focusRunsStarted: number;
+  recoveriesUsed: number;
   paywallSeen: boolean;
+  softPaywallSeenAt: string | null;
+  hardPaywallSeenAt: string | null;
 }
 
 export interface StreakFreezeState {
@@ -152,6 +173,15 @@ export interface AnalyticsState {
   events: AnalyticsEvent[];
 }
 
+export interface RecoveryState {
+  lastRecoveryPromptAt: string | null;
+  lastRecoveryCompletedAt: string | null;
+  lastRecoverySource: 'abandon' | 'missed-day' | 'swap-fatigue' | null;
+  triggeredCount: number;
+  completedCount: number;
+  abandonedCount: number;
+}
+
 export interface AppData {
   decisions: DecisionRecord[];
   skipLedger: SkipLedger;
@@ -159,6 +189,8 @@ export interface AppData {
   language: SupportedLanguage;
   subscription: SubscriptionState;
   onboardingDone: boolean;
+  onboardingCompletedAt: string | null;
+  firstActivatedAt: string | null;
   currentSystem: SystemId;
   usage: DailyUsage;
   persona: PersonaArchetype | null;
@@ -167,6 +199,7 @@ export interface AppData {
   notifications: NotificationState;
   streakFreeze: StreakFreezeState;
   gifting: GiftMoveState;
+  recovery: RecoveryState;
 }
 
 export interface InsightCard {
@@ -175,4 +208,31 @@ export interface InsightCard {
   title: string;
   body: string;
   metric: string;
+}
+
+export interface UserEntitlements {
+  phase: 'activation' | 'free' | 'premium';
+  isActivationPhase: boolean;
+  isPremium: boolean;
+  moveLimit: number;
+  swapLimit: number;
+  focusRunLimit: number;
+  guidanceTier: GuidanceTier;
+  premiumInsights: boolean;
+  premiumRecovery: boolean;
+  streakProtection: boolean;
+  advancedChallengeTracks: boolean;
+}
+
+export interface UserAccessState {
+  entitlements: UserEntitlements;
+  activationDay: number | null;
+  activationEndsAt: string | null;
+  movesUsedToday: number;
+  swapsUsedToday: number;
+  focusRunsStartedToday: number;
+  movesRemaining: number;
+  swapsRemaining: number;
+  hasHitMoveLimit: boolean;
+  hasHitSwapLimit: boolean;
 }

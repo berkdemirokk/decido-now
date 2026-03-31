@@ -12,6 +12,7 @@ import {
   PlanTier,
   Suggestion,
 } from '../types';
+import { toLocalDateKey } from './entitlements';
 
 export const MODE_OPTIONS: Array<{ key: Mode; label: string; hint: string }> = [
   { key: 'stuck', label: 'Tikandim', hint: 'Baslamak zor geliyorsa' },
@@ -100,7 +101,7 @@ const recentPenaltyWindow = 12;
 const recentCategoryWindow = 6;
 
 export function getTodayKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  return toLocalDateKey(date);
 }
 
 export function getDailySpark(date = new Date()) {
@@ -138,6 +139,7 @@ export function pickSuggestions(context: DecisionContext, decisions: DecisionRec
     .map((decision) => decision.selectedSuggestion.category);
   const reviewed = decisions.filter((decision) => decision.reviewedAt);
   const learning = buildLearningModel(reviewed);
+  const failureModel = buildFailureModel(reviewed);
   const currentDaypart = getDaypartKey(new Date().getHours());
 
   const ranked = SUGGESTIONS.map((suggestion) => ({
@@ -148,6 +150,7 @@ export function pickSuggestions(context: DecisionContext, decisions: DecisionRec
       recentIds,
       recentCategories,
       learning,
+      failureModel,
       currentDaypart
     ),
   }))
@@ -183,7 +186,7 @@ export function pickSuggestions(context: DecisionContext, decisions: DecisionRec
     return fallback.length ? fallback : SUGGESTIONS.slice(0, 3);
   }
 
-  return finalPicks.sort(() => Math.random() - 0.5);
+  return diversifyPicks(finalPicks, reviewed);
 }
 
 function scoreSuggestion(
@@ -192,6 +195,7 @@ function scoreSuggestion(
   recentIds: string[],
   recentCategories: Category[],
   learning: LearningModel,
+  failureModel: FailureModel,
   currentDaypart: string
 ) {
   let score = 0;
@@ -271,8 +275,34 @@ function scoreSuggestion(
     learning.frictionCategoryScores[getComboKey(context.friction, suggestion.category)] ?? 0;
   score += learning.modeCategoryScores[getComboKey(context.mode, suggestion.category)] ?? 0;
   score += learning.energyCategoryScores[getComboKey(context.energy, suggestion.category)] ?? 0;
+  score += failureModel.categoryPenalty[suggestion.category] ?? 0;
+  score += failureModel.suggestionPenalty[suggestion.id] ?? 0;
+  score += failureModel.timePenalty[getTimeBucket(suggestion.minutes)] ?? 0;
+  score += failureModel.swapPenalty[(suggestion.minutes <= 10 ? 'short' : 'long')] ?? 0;
+
+  if (failureModel.recentAbandonCount >= 2 && suggestion.minutes > 15) {
+    score -= 1.8;
+  }
+
+  if (failureModel.swapHeavyCount >= 2 && suggestion.minutes <= 10) {
+    score += 1.3;
+  }
+
+  if (failureModel.categorySuccess[suggestion.category] >= 2) {
+    score += 1.1;
+  }
 
   return score;
+}
+
+interface FailureModel {
+  categoryPenalty: Record<string, number>;
+  suggestionPenalty: Record<string, number>;
+  categorySuccess: Record<string, number>;
+  timePenalty: Record<string, number>;
+  swapPenalty: Record<string, number>;
+  recentAbandonCount: number;
+  swapHeavyCount: number;
 }
 
 interface LearningModel {
@@ -352,6 +382,56 @@ function buildLearningModel(decisions: DecisionRecord[]): LearningModel {
   }
 
   return normalizeModel(model);
+}
+
+function buildFailureModel(decisions: DecisionRecord[]): FailureModel {
+  const recent = decisions.slice(0, 10);
+  const categoryPenalty: Record<string, number> = {};
+  const suggestionPenalty: Record<string, number> = {};
+  const categorySuccess: Record<string, number> = {};
+  const timePenalty: Record<string, number> = {};
+  const swapPenalty: Record<string, number> = {};
+
+  let recentAbandonCount = 0;
+  let swapHeavyCount = 0;
+
+  for (const decision of recent) {
+    const category = decision.selectedSuggestion.category;
+    const suggestionId = decision.selectedSuggestion.id;
+    const bucket = getTimeBucket(decision.selectedSuggestion.minutes);
+
+    if (decision.focusRunOutcome === 'abandoned' || decision.completion === 'skipped') {
+      recentAbandonCount += 1;
+      addWeightedScore(categoryPenalty, category, -1.8);
+      addWeightedScore(suggestionPenalty, suggestionId, -2.4);
+      addWeightedScore(timePenalty, bucket, bucket === 'long' ? -1.6 : -0.8);
+    }
+
+    if (decision.completion === 'partial') {
+      addWeightedScore(categoryPenalty, category, -0.6);
+      addWeightedScore(suggestionPenalty, suggestionId, -0.8);
+    }
+
+    if (decision.completion === 'done' && (decision.resultScore ?? 0) >= 4) {
+      addWeightedScore(categorySuccess, category, 1.2);
+      addWeightedScore(timePenalty, bucket, bucket === 'short' ? 0.8 : 0.3);
+    }
+
+    if ((decision.swapCountBeforeSelection ?? 0) > 1) {
+      swapHeavyCount += 1;
+      addWeightedScore(swapPenalty, decision.selectedSuggestion.minutes <= 10 ? 'short' : 'long', decision.completion === 'done' ? 0.4 : -0.9);
+    }
+  }
+
+  return {
+    categoryPenalty: clampRecord(categoryPenalty, 3),
+    suggestionPenalty: clampRecord(suggestionPenalty, 3.5),
+    categorySuccess: clampRecord(categorySuccess, 2),
+    timePenalty: clampRecord(timePenalty, 2),
+    swapPenalty: clampRecord(swapPenalty, 1.5),
+    recentAbandonCount,
+    swapHeavyCount,
+  };
 }
 
 function addWeightedScore(bucket: Record<string, number>, key: string, value: number) {
@@ -490,4 +570,29 @@ function getDaypartKey(hour: number) {
   }
 
   return 'evening';
+}
+
+function diversifyPicks(picks: Suggestion[], reviewed: DecisionRecord[]) {
+  return picks
+    .map((suggestion, index) => ({
+      suggestion,
+      index,
+      freshness: computeFreshnessBonus(suggestion, reviewed),
+    }))
+    .sort((left, right) => {
+      const freshnessDiff = right.freshness - left.freshness;
+      if (freshnessDiff !== 0) return freshnessDiff;
+      return left.index - right.index;
+    })
+    .map((entry) => entry.suggestion);
+}
+
+function computeFreshnessBonus(suggestion: Suggestion, reviewed: DecisionRecord[]) {
+  const lastSeenIndex = reviewed.findIndex(
+    (decision) => decision.selectedSuggestion.id === suggestion.id
+  );
+
+  if (lastSeenIndex === -1) return 3;
+  if (lastSeenIndex > 6) return 1.5;
+  return 0;
 }

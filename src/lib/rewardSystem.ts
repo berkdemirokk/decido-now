@@ -1,4 +1,4 @@
-import { CompletionState, DecisionRecord, SupportedLanguage } from '../types';
+﻿import { CompletionState, DecisionRecord, SupportedLanguage } from '../types';
 
 const LEVELS = [
   { name: 'Beginner', minXp: 0 },
@@ -48,11 +48,11 @@ export function buildRewardProfile(
     momentumLine:
       language === 'tr'
         ? strongCount >= 5
-          ? 'Son hamlelerde momentum birikiyor.'
-          : 'Skorlanan her hamle DNA ve momentumunu guclendirir.'
+          ? 'Son kapanislarda momentum net sekilde birikiyor.'
+          : 'Skorlanan her hamle sistemi ve ritmini daha sert okutur.'
         : strongCount >= 5
-          ? 'Your recent moves are stacking visible momentum.'
-          : 'Every scored move strengthens your DNA and momentum.',
+          ? 'Your recent closes are stacking visible momentum.'
+          : 'Every scored move sharpens both the system and your rhythm.',
   };
 }
 
@@ -77,15 +77,15 @@ export function buildRewardResult(
     message:
       language === 'tr'
         ? completion === 'done'
-          ? 'Temiz bir hamle kapattin. Sistem artik seni daha keskin okuyacak.'
+          ? 'Bugun korundu. Temiz bir hamle kapattin.'
           : completion === 'partial'
-            ? 'Kismi ilerleme bile ritmi korur. Yarin daha sert donebilirsin.'
-            : 'Bugun kapanmadi. Yarin daha hafif ama daha akilli bir giris acacagiz.'
+            ? 'Tam kapanmadi ama bugun hala toparlanabilir.'
+            : 'Bugun kaydi. En hizli cikis akilli bir toparlanma hamlesi.'
         : completion === 'done'
-          ? 'You closed a clean move. The system can now sharpen around you faster.'
+          ? 'Today is secured. You closed a clean move.'
           : completion === 'partial'
-            ? 'Partial progress still protects the rhythm.'
-            : 'This one did not close. Tomorrow we open with a lighter, smarter recovery move.',
+            ? 'It did not fully close, but the day can still be salvaged.'
+            : 'This one slipped. The fastest path now is a smart recovery move.',
   };
 }
 
@@ -115,3 +115,4 @@ function getCurrentLevelIndex(xp: number) {
   }
   return index;
 }
+

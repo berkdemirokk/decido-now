@@ -1,4 +1,13 @@
-import { Category, DecisionContext, DecisionRecord, Friction, Goal, PersonaArchetype, Suggestion, SupportedLanguage } from '../types';
+﻿import {
+  Category,
+  DecisionContext,
+  DecisionRecord,
+  Friction,
+  Goal,
+  PersonaArchetype,
+  Suggestion,
+  SupportedLanguage,
+} from '../types';
 import { buildPersonaProfile } from './persona';
 
 export interface GuidancePack {
@@ -13,10 +22,10 @@ export interface GuidancePack {
 interface GuidanceHistory {
   reviewedCount: number;
   similarCount: number;
-  strongCount: number;
   doneRate: number;
   averageScore: number;
-  lastResult: DecisionRecord | null;
+  abandonRate: number;
+  swapHeavyCount: number;
 }
 
 export function buildGuidance(
@@ -30,33 +39,22 @@ export function buildGuidance(
   const personaProfile = persona ? buildPersonaProfile(persona, language, context.goal) : null;
 
   return {
-    whyFits: withPersonaPrefix(
+    whyFits: withPrefix(
       buildWhyFits(suggestion, context, language, history),
       personaProfile?.guidanceTone.whyPrefix
     ),
     whatYouGain: buildGain(suggestion, context, language, history),
-    steps: applyActionTone(
+    steps: applyActionPrefix(
       buildSteps(suggestion, context, language, history),
       personaProfile?.guidanceTone.actionPrefix
     ),
     tinyLesson: buildLesson(suggestion, context, language, history),
     expectedOutcome: buildExpectedOutcome(suggestion, context, language, history),
-    continueTomorrow: withPersonaPrefix(
-      buildTomorrowStep(suggestion, context, language, history),
+    continueTomorrow: withPrefix(
+      buildTomorrow(suggestion, context, language, history),
       personaProfile?.guidanceTone.tomorrowPrefix
     ),
   };
-}
-
-function withPersonaPrefix(text: string, prefix?: string) {
-  if (!prefix) return text;
-  return `${prefix} ${text}`;
-}
-
-function applyActionTone(steps: string[], prefix?: string) {
-  if (!prefix) return steps;
-  if (!steps.length) return steps;
-  return [prefix, ...steps];
 }
 
 function buildHistory(
@@ -72,8 +70,14 @@ function buildHistory(
     const sameMode = decision.context.mode === context.mode;
     return sameCategory || (sameGoal && sameFriction) || (sameCategory && sameMode);
   });
-  const done = similar.filter((decision) => decision.completion === 'done').length;
-  const strong = similar.filter((decision) => (decision.resultScore ?? 0) >= 4).length;
+
+  const doneCount = similar.filter((decision) => decision.completion === 'done').length;
+  const abandonedCount = similar.filter(
+    (decision) => decision.focusRunOutcome === 'abandoned'
+  ).length;
+  const swapHeavyCount = similar.filter(
+    (decision) => (decision.swapCountBeforeSelection ?? 0) > 1
+  ).length;
   const averageScore = similar.length
     ? Number(
         (
@@ -85,10 +89,10 @@ function buildHistory(
   return {
     reviewedCount: reviewed.length,
     similarCount: similar.length,
-    strongCount: strong,
-    doneRate: similar.length ? done / similar.length : 0,
+    doneRate: similar.length ? doneCount / similar.length : 0,
     averageScore,
-    lastResult: similar[0] ?? null,
+    abandonRate: similar.length ? abandonedCount / similar.length : 0,
+    swapHeavyCount,
   };
 }
 
@@ -100,25 +104,25 @@ function buildWhyFits(
 ) {
   if (language === 'tr') {
     if (history.similarCount >= 3) {
-      return `${describeGoal(context.goal, 'tr')} odağında ${describeCategory(suggestion.category, 'tr')} hamleleri sende son ${history.similarCount} benzer denemede ortalama ${history.averageScore || 3.8}/5 verdi. Özellikle ${describeFriction(context.friction, 'tr')} anlarında ${suggestion.minutes} dakikalık görünür adımlar daha temiz başlangıç çıkarıyor.`;
+      return `${describeGoal(context.goal, 'tr')} tarafinda benzer ${history.similarCount} hamle goruldu. Bu tip hamleler sende ortalama ${history.averageScore || 3.6}/5 veriyor ve ${Math.round(history.doneRate * 100)}% daha temiz kapanis uretiyor.`;
     }
 
     if (history.reviewedCount >= 3) {
-      return `Sistemin gördüğü son hamlelere göre ${describeFriction(context.friction, 'tr')} halindeyken kısa ve görünür adımlar sende daha güvenli çalışıyor. Bu öneri ${describeGoal(context.goal, 'tr')} niyetini fazla sürtünme yaratmadan hareket ettirmek için seçildi.`;
+      return `${describeFriction(context.friction, 'tr')} anlarinda kisa ve gorunur hamleler sende daha guvenli calisiyor. Bu secim bugunu acmak icin en dusuk surtunmeli yol.`;
     }
 
-    return `${describeGoal(context.goal, 'tr')} odağında ve ${describeFriction(context.friction, 'tr')} halindeyken ${suggestion.minutes} dakikalık görünür bir adım sana fazla düşünmeden harekete geçme şansı verir.`;
+    return `${describeGoal(context.goal, 'tr')} odaginda ve ${describeFriction(context.friction, 'tr')} halinde, ${suggestion.minutes} dakikalik net bir hamle seni fazla dusunmeden harekete sokar.`;
   }
 
   if (history.similarCount >= 3) {
-    return `Across your last ${history.similarCount} similar moves, ${describeCategory(suggestion.category, 'en')} actions have returned about ${history.averageScore || 3.8}/5 for you. In ${describeFriction(context.friction, 'en')} moments, visible ${suggestion.minutes}-minute moves are where you tend to restart faster.`;
+    return `You already have ${history.similarCount} similar moves on record. This format is returning about ${history.averageScore || 3.6}/5 and closing cleanly ${Math.round(history.doneRate * 100)}% of the time.`;
   }
 
   if (history.reviewedCount >= 3) {
-    return `Based on the moves you have already scored, short visible actions are a safer restart pattern for you when ${describeFriction(context.friction, 'en')}. This option was picked to move your ${describeGoal(context.goal, 'en')} goal without adding more drag.`;
+    return `In ${describeFriction(context.friction, 'en')} moments, shorter visible moves are a safer start pattern for you. This is the lowest-drag move for today.`;
   }
 
-  return `With a ${describeGoal(context.goal, 'en')} goal and a ${describeFriction(context.friction, 'en')} blocker, a visible ${suggestion.minutes}-minute move gives you a cleaner way to start without overthinking.`;
+  return `With a ${describeGoal(context.goal, 'en')} goal and a ${describeFriction(context.friction, 'en')} blocker, a ${suggestion.minutes}-minute visible move is the cleanest way to start.`;
 }
 
 function buildGain(
@@ -127,55 +131,25 @@ function buildGain(
   language: SupportedLanguage,
   history: GuidanceHistory
 ) {
-  const categoryGain =
-    suggestion.category === 'learn'
-      ? {
-          tr: 'Dağınık bilgiyi somut öğrenmeye çevirir ve bir konuda net ilerleme hissi verir.',
-          en: 'Turns scattered curiosity into concrete learning and gives you visible progress in one topic.',
-        }
-      : suggestion.category === 'language'
-        ? {
-            tr: 'Dil konusunda çekingenliği düşürür ve aktif kullanım kasını açar.',
-            en: 'Reduces hesitation around language practice and gets you using it actively.',
-          }
-        : suggestion.category === 'earn' || suggestion.category === 'money'
-          ? {
-              tr: 'Gelir veya para tarafındaki soyut stresi görünür aksiyona çevirir.',
-              en: 'Turns vague money stress into a visible action you can complete today.',
-            }
-          : suggestion.category === 'health'
-            ? {
-                tr: 'Enerjiyi toparlar ve sonraki kararların kalitesini yükseltebilir.',
-                en: 'Can reset your energy and improve the quality of the decisions that follow.',
-              }
-            : suggestion.category === 'reset'
-              ? {
-                  tr: 'Zihinsel gürültüyü azaltır ve karar vermeyi kolaylaştırır.',
-                  en: 'Lowers mental noise and makes the next decision easier to take.',
-                }
-              : suggestion.category === 'social'
-                ? {
-                    tr: 'Sosyal yükü azaltır ve bağ hissini güçlendirir.',
-                    en: 'Reduces social drag and strengthens your sense of connection.',
-                  }
-                : {
-                    tr: 'Kararsızlığı azaltır ve bugünün momentumunu daha hızlı açar.',
-                    en: "Reduces hesitation and opens today's momentum faster.",
-                  };
+  const gain = getCategoryGain(suggestion.category, language);
 
-  if (history.similarCount >= 2) {
-    if (language === 'tr') {
-      return `${categoryGain.tr} Bu formatta şu ana kadar ${history.strongCount} güçlü dönüş gördün; yani bu yalnızca teorik olarak değil, pratikte de sende çalışmaya başlamış bir desen.`;
-    }
+  if (history.swapHeavyCount >= 2) {
+    return language === 'tr'
+      ? `${gain} Ayrica daha fazla secim degistirmeden tek yone girmene yardim eder.`
+      : `${gain} It also helps you stop burning energy on extra switching.`;
+  }
 
-    return `${categoryGain.en} You have already seen ${history.strongCount} strong outcomes in moves like this, so the value here is not just theoretical.`;
+  if (history.abandonRate >= 0.35) {
+    return language === 'tr'
+      ? `${gain} Bu format, yari yolda biraktigin bloklara gore daha guvenli bir kapanis sansi verir.`
+      : `${gain} Compared with the moves you tend to abandon, this format gives you a safer path to closure.`;
   }
 
   if (language === 'tr') {
-    return `${categoryGain.tr} Bu hamle özellikle ${describeGoal(context.goal, 'tr')} tarafında bugüne bir sonuç hissi eklemek için iyi bir köprü görevi görür.`;
+    return `${gain} Bugunu acik niyetten gorunur sonuca cevirir.`;
   }
 
-  return `${categoryGain.en} This move is especially useful when you want your ${describeGoal(context.goal, 'en')} goal to feel real today instead of staying abstract.`;
+  return `${gain} It turns today from loose intent into something visible.`;
 }
 
 function buildSteps(
@@ -184,44 +158,41 @@ function buildSteps(
   language: SupportedLanguage,
   history: GuidanceHistory
 ) {
-  const opener =
-    language === 'tr'
-      ? getOpeningStepTr(context, history)
-      : getOpeningStepEn(context, history);
+  const open = getOpeningStep(context, language, history);
 
   switch (suggestion.category) {
     case 'learn':
       return language === 'tr'
-        ? [opener, '3 temel not çıkar.', 'Bitince bir cümleyle kendine anlat.']
-        : [opener, 'Pull out 3 anchor notes.', 'Explain it back in one sentence.'];
+        ? [open, '3 ana not cikar.', 'Bitince tek cumleyle geri anlat.']
+        : [open, 'Pull out 3 anchor notes.', 'Explain it back in one sentence.'];
     case 'language':
       return language === 'tr'
-        ? [opener, '10 kelime ya da 1 mini diyalog seç.', 'Sesli tekrar edip kendi örneğini kur.']
-        : [opener, 'Choose 10 words or one micro dialogue.', 'Repeat it out loud and build one example of your own.'];
+        ? [open, '10 kelime ya da 1 mini diyalog sec.', 'Sesli tekrar et ve tek bir ornek kur.']
+        : [open, 'Choose 10 words or one micro dialogue.', 'Repeat it out loud and build one example.'];
     case 'earn':
       return language === 'tr'
-        ? [opener, 'Tek teklif ya da hedef kişiyi seç.', 'Mesajı kısaltıp bugün gönder.']
-        : [opener, 'Pick one offer or one target person.', 'Shorten the message and send it today.'];
+        ? [open, 'Tek kisiyi ya da tek teklifi sec.', 'Mesaji kisalt ve bugun gonder.']
+        : [open, 'Pick one person or one offer.', 'Shorten the message and send it today.'];
     case 'money':
       return language === 'tr'
-        ? [opener, 'Tek harcama alanını aç.', 'En büyük sızıntıyı bulup tek kural koy.']
-        : [opener, 'Open one spending area.', 'Find the biggest leak and set one simple rule.'];
+        ? [open, 'Tek para akisini ac.', 'En buyuk sizintiyi bul ve tek kural koy.']
+        : [open, 'Open one money area.', 'Find the biggest leak and set one rule.'];
     case 'health':
       return language === 'tr'
-        ? [opener, 'Alan aç ve hareketi başlat.', 'Bitince enerjini tek kelimeyle not et.']
-        : [opener, 'Create space and start the movement.', 'Log your energy in one word when you finish.'];
+        ? [open, 'Alani ac ve hareketi baslat.', 'Bitince enerjini tek kelimeyle not et.']
+        : [open, 'Create space and start the movement.', 'Log your energy in one word when you finish.'];
     case 'reset':
       return language === 'tr'
-        ? [opener, 'Gürültüyü tek yere boşalt.', 'Bugün kapatacağın bir alanı gerçekten kapat.']
-        : [opener, 'Dump the noise into one place.', 'Fully close one area today.'];
+        ? [open, 'Gurultuyu tek yere bosalt.', 'Bugun kapanacak tek alani gercekten kapat.']
+        : [open, 'Dump the noise into one place.', 'Fully close one area today.'];
     case 'social':
       return language === 'tr'
-        ? [opener, 'Tek kişiyi seç.', 'Mesajı kısaltıp hemen gönder.']
-        : [opener, 'Pick one person.', 'Shorten the message and send it now.'];
+        ? [open, 'Tek kisiyi sec.', 'Mesaji kisalt ve gonder.']
+        : [open, 'Pick one person.', 'Shorten the message and send it.'];
     default:
       return language === 'tr'
-        ? [opener, 'Tek hedefi seç.', 'Süre boyunca sadece ona bak ve bitince sonucu kaydet.']
-        : [opener, 'Pick one target.', 'Stay with it for the full timer and record the result when you finish.'];
+        ? [open, 'Tek hedefi sec.', 'Sure boyunca sadece ona bak ve sonucu kaydet.']
+        : [open, 'Pick one target.', 'Stay with it and record the result when you finish.'];
   }
 }
 
@@ -231,60 +202,21 @@ function buildLesson(
   language: SupportedLanguage,
   history: GuidanceHistory
 ) {
-  const base =
-    suggestion.category === 'learn'
-      ? {
-          tr: 'Bilgi en çok, öğrenilen şeyi kendi cümlenle yeniden kurduğunda kalıcı olur.',
-          en: 'Learning sticks best when you rebuild the idea in your own words.',
-        }
-      : suggestion.category === 'language'
-        ? {
-            tr: 'Dil, izleyerek değil kullanarak ilerler. Kısa sesli tekrarlar çekingenliği düşürür.',
-            en: 'Language grows through use, not passive exposure. Short spoken reps reduce hesitation.',
-          }
-        : suggestion.category === 'earn'
-          ? {
-              tr: 'Gelir tarafında en büyük eşik genelde kalite değil, ilk çıkıştır.',
-              en: 'In earning moves, the biggest blocker is usually not quality but making the first reach-out.',
-            }
-          : suggestion.category === 'money'
-            ? {
-                tr: 'Para stresi en çok belirsizlikten beslenir; görünür tablo kontrol hissi yaratır.',
-                en: 'Money stress feeds on vagueness; a visible picture creates a sense of control.',
-              }
-            : suggestion.category === 'health'
-              ? {
-                  tr: 'Bedensel enerji düzelince zihinsel karar kalitesi de yükselir.',
-                  en: 'When physical energy improves, mental decision quality often improves too.',
-                }
-              : suggestion.category === 'reset'
-                ? {
-                    tr: 'Küçük görünür toparlama hareketleri, büyük motivasyon dalgasından daha güvenilir çalışır.',
-                    en: 'Small visible reset moves are more reliable than waiting for a huge motivation wave.',
-                  }
-                : suggestion.category === 'social'
-                  ? {
-                      tr: 'Sosyal bağ kurmada en pahalı şey uzun beklemedir; kısa temas daha sürdürülebilirdir.',
-                      en: 'In relationships, long delays cost more than short imperfect contact.',
-                    }
-                  : {
-                      tr: 'Kısa, net ve görünür adımlar beynin erteleme direncini düşürür.',
-                      en: 'Short, visible actions lower the brain resistance to starting.',
-                    };
+  const base = getCategoryLesson(suggestion.category, language);
 
-  if (history.similarCount >= 3 && context.friction === 'avoidant') {
+  if (history.abandonRate >= 0.35) {
     return language === 'tr'
-      ? `${base.tr} Sende özellikle kaçınma anlarında, kaliteyi büyütmek yerine ilk teması açmak daha iyi sonuç veriyor.`
-      : `${base.en} For you, especially in avoidance moments, opening contact beats trying to perfect the move first.`;
+      ? `${base} Sende asil risk kalite degil, gec baslamak.`
+      : `${base} Your bigger risk is not quality. It is starting too late.`;
   }
 
-  if (history.similarCount >= 3 && context.friction === 'tired') {
+  if (context.friction === 'avoidant') {
     return language === 'tr'
-      ? `${base.tr} Düşük enerjide kısa ve tamamlanabilir formatlar sende daha kalıcı momentum bırakıyor.`
-      : `${base.en} On low-energy days, short finishable formats are leaving a stronger trail of momentum for you.`;
+      ? `${base} Kacindigin anlarda ilk temas, kusursuz planlamadan daha fazla is cikariyor.`
+      : `${base} In avoidance moments, first contact beats perfect planning.`;
   }
 
-  return language === 'tr' ? base.tr : base.en;
+  return base;
 }
 
 function buildExpectedOutcome(
@@ -295,157 +227,226 @@ function buildExpectedOutcome(
 ) {
   if (language === 'tr') {
     if (history.similarCount >= 3) {
-      return `Benzer hamlelerde tamamlama oranın yaklaşık %${Math.round(history.doneRate * 100)}. Bu turda beklenti, ${suggestion.minutes} dakika sonunda daha net bir durum ve kayda geçecek bir sonuç çıkarman.`;
+      return `Hedef: ${suggestion.minutes} dakika sonunda kayda gececek tek bir sonuc almak. Benzer hamlelerde kapanis oranin yaklasik %${Math.round(history.doneRate * 100)}.`;
     }
 
-    return `${suggestion.minutes} dakika sonunda ${describeGoal(context.goal, 'tr')} tarafında daha net bir durum, daha düşük sürtünme ve skora çevrilebilir bir sonuç beklersin.`;
+    return `Hedef: ${suggestion.minutes} dakika sonunda gorunur tek bir sonuc almak ve surtunmeyi dusurmek.`;
   }
 
   if (history.similarCount >= 3) {
-    return `Your completion rate on similar moves is about ${Math.round(history.doneRate * 100)}%. The goal here is to leave this ${suggestion.minutes}-minute block with one visible outcome you can score.`;
+    return `Goal: leave this ${suggestion.minutes}-minute block with one visible result you can score. Similar moves are closing about ${Math.round(history.doneRate * 100)}% of the time.`;
   }
 
-  return `At the end of ${suggestion.minutes} minutes, expect more clarity around your ${describeGoal(context.goal, 'en')} goal, lower friction, and one visible result you can score.`;
+  return `Goal: leave this ${suggestion.minutes}-minute block with one visible result and lower drag for the next move.`;
 }
 
-function buildTomorrowStep(
+function buildTomorrow(
   suggestion: Suggestion,
   context: DecisionContext,
   language: SupportedLanguage,
   history: GuidanceHistory
 ) {
-  const stretch = history.averageScore >= 4 ? 'deeper' : 'lighter';
+  const deeper = history.averageScore >= 4 && history.doneRate >= 0.6;
 
   switch (suggestion.category) {
     case 'learn':
       return language === 'tr'
-        ? stretch === 'deeper'
-          ? 'Yarın aynı konudan tek bir alt başlığı derinleştir.'
-          : 'Yarın bugünkü konuyu 5 dakikalık tekrar turuyla koru.'
-        : stretch === 'deeper'
-          ? 'Tomorrow, deepen one subtopic from this same learning area.'
-          : 'Tomorrow, protect this topic with a 5-minute review lap.';
+        ? deeper
+          ? 'Yarin ayni konunun tek alt basligina in.'
+          : 'Yarin 5 dakikalik bir tekrar turu ac.'
+        : deeper
+          ? 'Tomorrow, go one layer deeper on the same topic.'
+          : 'Tomorrow, open a 5-minute review lap.';
     case 'language':
       return language === 'tr'
-        ? stretch === 'deeper'
-          ? 'Yarın aynı kelime ya da kalıplarla kısa bir ses kaydı bırak.'
-          : 'Yarın bugün kullandığın kelimelerle tek bir mini tekrar yap.'
-        : stretch === 'deeper'
-          ? 'Tomorrow, record a short voice note with the same words or pattern.'
-          : 'Tomorrow, run one tiny repetition with the words you used today.';
+        ? deeper
+          ? 'Yarin ayni kalipla sesli mini tekrar yap.'
+          : 'Yarin bugunku kelimelerle tek mini tur daha don.'
+        : deeper
+          ? 'Tomorrow, do one spoken mini repeat with the same pattern.'
+          : "Tomorrow, run one more tiny lap with today's words.";
     case 'earn':
       return language === 'tr'
-        ? stretch === 'deeper'
-          ? 'Yarın bugünkü çıkışı ikinci bir kişiye ya da teklife genişlet.'
-          : 'Yarın aynı alan için daha kısa bir ikinci outreach dene.'
-        : stretch === 'deeper'
-          ? "Tomorrow, extend today's outreach to one more person or offer."
-          : 'Tomorrow, try one shorter follow-up outreach in the same lane.';
-    case 'health':
-      return language === 'tr'
-        ? stretch === 'deeper'
-          ? 'Yarın aynı enerjide bu hareketi bir kademe büyüt.'
-          : 'Yarın aynı hareketin daha kısa bir versiyonunu tekrar et.'
-        : stretch === 'deeper'
-          ? 'Tomorrow, grow this same movement one level.'
-          : 'Tomorrow, repeat a shorter version of the same move.';
+        ? deeper
+          ? 'Yarin bugunku cikisi ikinci kisiye ac.'
+          : 'Yarin ayni alanda daha kisa bir follow-up gonder.'
+        : deeper
+          ? "Tomorrow, extend today's reach to one more person."
+          : 'Tomorrow, send one shorter follow-up in the same lane.';
     case 'reset':
       return language === 'tr'
-        ? stretch === 'deeper'
-          ? 'Yarın bugün kapattığın alanın yanındaki tek bir şeyi daha sadeleştir.'
-          : 'Yarın aynı alanı korumak için 3 dakikalık mini kapatma yap.'
-        : stretch === 'deeper'
-          ? 'Tomorrow, simplify one more thing next to the area you closed today.'
+        ? deeper
+          ? 'Yarin ayni alanin yaninda tek bir seyi daha sadelestir.'
+          : 'Yarin bu reseti 3 dakikalik mini kapama ile koru.'
+        : deeper
+          ? 'Tomorrow, simplify one more thing next to the area you closed.'
           : 'Tomorrow, protect this reset with a 3-minute mini close.';
     default:
       return language === 'tr'
-        ? stretch === 'deeper'
-          ? 'Yarın bunun bir kademe daha zor ama benzer versiyonunu dene.'
-          : 'Yarın aynı yapının daha kısa ve temiz bir tekrarını yap.'
-        : stretch === 'deeper'
-          ? 'Tomorrow, try a slightly harder version of the same move.'
-          : 'Tomorrow, repeat the same structure in a shorter cleaner version.';
+        ? deeper
+          ? 'Yarin ayni yapinin bir kademe daha zorunu dene.'
+          : 'Yarin ayni yapinin daha kisa bir tekrarini yap.'
+        : deeper
+          ? 'Tomorrow, try a slightly harder version of the same structure.'
+          : 'Tomorrow, repeat the same structure in a shorter version.';
   }
 }
 
-function getOpeningStepTr(context: DecisionContext, history: GuidanceHistory) {
+function getOpeningStep(
+  context: DecisionContext,
+  language: SupportedLanguage,
+  history: GuidanceHistory
+) {
   if (context.friction === 'unclear') {
-    return history.lastResult
-      ? 'Önce bitince nasıl görüneceğini tek cümleyle yaz.'
-      : 'Önce bitince nasıl görüneceğini tek cümleyle netleştir.';
+    return language === 'tr'
+      ? history.reviewedCount > 0
+        ? 'Bitince nasil gorunecegini tek cumleyle yaz.'
+        : 'Once bitmis halini tek cumleyle netlestir.'
+      : history.reviewedCount > 0
+        ? 'Write one sentence that defines done.'
+        : 'Define the finished state in one sentence.';
   }
 
   if (context.friction === 'distracted') {
-    return 'Telefonu uzağa koy ve yalnızca bu hareket için tek pencere bırak.';
+    return language === 'tr'
+      ? 'Tek bir ekran birak. Digerini kapa.'
+      : 'Leave one screen open. Close the rest.';
   }
 
   if (context.friction === 'tired') {
-    return 'Zorlamadan başla; ilk 2 dakikayı yalnızca ritim kurmaya ayır.';
+    return language === 'tr'
+      ? 'Gucu zorlamadan basla. Ilk 2 dakika sadece ritim kur.'
+      : 'Start without forcing intensity. Use the first 2 minutes to catch rhythm.';
   }
 
   if (context.friction === 'anxious') {
-    return 'Mükemmel versiyonu değil, gönderilebilir ilk versiyonu hedefle.';
+    return language === 'tr'
+      ? 'Mukemmel olani degil, gonderilebilir ilk versiyonu hedefle.'
+      : 'Do not aim for perfect. Aim for sendable.';
   }
 
-  return 'Kaçınmayı kırmak için ilk teması 60 saniye içinde aç.';
+  return language === 'tr'
+    ? 'Kacinmayi kirmak icin ilk temasi 60 saniyede ac.'
+    : 'Break avoidance by opening contact inside 60 seconds.';
 }
 
-function getOpeningStepEn(context: DecisionContext, history: GuidanceHistory) {
-  if (context.friction === 'unclear') {
-    return history.lastResult
-      ? 'Start by writing one sentence that defines what done looks like.'
-      : 'Start by defining what done looks like in one sentence.';
-  }
+function getCategoryGain(category: Category, language: SupportedLanguage) {
+  const copy = {
+    learn: {
+      tr: 'Daginik bilgiyi somut ogrenmeye cevirir.',
+      en: 'Turns scattered curiosity into concrete learning.',
+    },
+    language: {
+      tr: 'Dil cekingenligini indirip aktif kullanim kasini acar.',
+      en: 'Reduces language hesitation and opens active use.',
+    },
+    earn: {
+      tr: 'Soyut gelir stresini bugunluk gorunur aksiyona cevirir.',
+      en: 'Turns vague money pressure into visible action.',
+    },
+    money: {
+      tr: 'Para tarafindaki belirsizligi gorunur hale getirir.',
+      en: 'Makes money friction visible and manageable.',
+    },
+    health: {
+      tr: 'Enerjiyi toplar ve sonraki kararlari kolaylastirir.',
+      en: 'Resets energy and makes later decisions easier.',
+    },
+    reset: {
+      tr: 'Zihinsel gurultuyu indirir ve secim kalitesini toparlar.',
+      en: 'Lowers mental noise and restores selection quality.',
+    },
+    social: {
+      tr: 'Sosyal surtunmeyi indirip bag kurmayi kolaylastirir.',
+      en: 'Cuts social friction and makes connection easier.',
+    },
+    focus: {
+      tr: 'Kararsizligi kirip bugune gorunur bir sonuc ekler.',
+      en: 'Breaks hesitation and adds one visible result to the day.',
+    },
+    growth: {
+      tr: 'Belirsiz gelisimi bugunluk net bir adima indirir.',
+      en: 'Turns vague growth into one clear move today.',
+    },
+  } satisfies Record<Category, { tr: string; en: string }>;
 
-  if (context.friction === 'distracted') {
-    return 'Put the phone away and leave only one surface open for this move.';
-  }
+  return copy[category][language === 'tr' ? 'tr' : 'en'];
+}
 
-  if (context.friction === 'tired') {
-    return 'Do not force intensity; use the first 2 minutes just to catch rhythm.';
-  }
+function getCategoryLesson(category: Category, language: SupportedLanguage) {
+  const copy = {
+    learn: {
+      tr: 'Bilgi en cok kendi cumlenle geri kurdugunda kalir.',
+      en: 'Learning sticks when you rebuild it in your own words.',
+    },
+    language: {
+      tr: 'Dil izleyerek degil, kullanarak acilir.',
+      en: 'Language opens through use, not passive exposure.',
+    },
+    earn: {
+      tr: 'Gelir tarafinda asil esik kalite degil, ilk cikistir.',
+      en: 'In earning moves, the real barrier is not quality. It is first contact.',
+    },
+    money: {
+      tr: 'Para stresi belirsizlikten beslenir. Gorunur tablo kontrol hissi verir.',
+      en: 'Money stress feeds on vagueness. A visible picture creates control.',
+    },
+    health: {
+      tr: 'Beden toparlaninca zihinsel karar kalitesi de yukselir.',
+      en: 'When the body resets, decision quality usually rises too.',
+    },
+    reset: {
+      tr: 'Kucuk gorunur resetler, buyuk motivasyon beklemekten daha guvenli calisir.',
+      en: 'Small visible resets work better than waiting for a big burst of motivation.',
+    },
+    social: {
+      tr: 'Sosyal alanda en pahali sey kusursuzluk degil, gec kalmaktir.',
+      en: 'In relationships, delay costs more than imperfection.',
+    },
+    focus: {
+      tr: 'Kisa ve gorunur adimlar beynin baslama direncini dusurur.',
+      en: "Short visible actions lower the brain's resistance to starting.",
+    },
+    growth: {
+      tr: 'Buyuk hedefler, tek hamleye indiklerinde kapanmaya baslar.',
+      en: 'Big goals start moving when they collapse into one move.',
+    },
+  } satisfies Record<Category, { tr: string; en: string }>;
 
-  if (context.friction === 'anxious') {
-    return 'Aim for the first sendable version, not the perfect one.';
-  }
+  return copy[category][language === 'tr' ? 'tr' : 'en'];
+}
 
-  return 'Break avoidance by opening contact in the first 60 seconds.';
+function withPrefix(text: string, prefix?: string) {
+  return prefix ? `${prefix} ${text}` : text;
+}
+
+function applyActionPrefix(steps: string[], prefix?: string) {
+  if (!prefix || !steps.length) return steps;
+  return [prefix, ...steps];
 }
 
 function describeGoal(goal: Goal, language: 'tr' | 'en') {
   const labels: Record<Goal, { tr: string; en: string }> = {
     finish: { tr: 'bitirme', en: 'finish' },
-    learn: { tr: 'öğrenme', en: 'learning' },
+    learn: { tr: 'ogrenme', en: 'learning' },
     earn: { tr: 'gelir', en: 'earning' },
     reset: { tr: 'toparlanma', en: 'reset' },
-    connect: { tr: 'bağ kurma', en: 'connection' },
-    build: { tr: 'üretim', en: 'building' },
+    connect: { tr: 'bag kurma', en: 'connection' },
+    build: { tr: 'uretim', en: 'building' },
   };
+
   return labels[goal][language];
 }
 
 function describeFriction(friction: Friction, language: 'tr' | 'en') {
   const labels: Record<Friction, { tr: string; en: string }> = {
-    unclear: { tr: 'belirsizlik', en: 'unclear moments' },
-    distracted: { tr: 'dikkat dağınıklığı', en: 'distracted moments' },
-    tired: { tr: 'düşük enerji', en: 'low-energy moments' },
-    anxious: { tr: 'kaygı', en: 'anxious moments' },
-    avoidant: { tr: 'kaçınma', en: 'avoidance moments' },
+    unclear: { tr: 'belirsizlik', en: 'unclear friction' },
+    distracted: { tr: 'daginiklik', en: 'distraction' },
+    tired: { tr: 'dusuk enerji', en: 'low energy' },
+    anxious: { tr: 'kaygi', en: 'anxiety' },
+    avoidant: { tr: 'kacinma', en: 'avoidance' },
   };
+
   return labels[friction][language];
 }
 
-function describeCategory(category: Category, language: 'tr' | 'en') {
-  const labels: Record<Category, { tr: string; en: string }> = {
-    focus: { tr: 'odak', en: 'focus' },
-    health: { tr: 'beden', en: 'health' },
-    money: { tr: 'para', en: 'money' },
-    social: { tr: 'sosyal', en: 'social' },
-    reset: { tr: 'reset', en: 'reset' },
-    growth: { tr: 'gelişim', en: 'growth' },
-    learn: { tr: 'öğrenme', en: 'learning' },
-    language: { tr: 'dil', en: 'language' },
-    earn: { tr: 'gelir', en: 'earning' },
-  };
-  return labels[category][language];
-}

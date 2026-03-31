@@ -75,7 +75,7 @@ const EN_SUGGESTION_COPY: Record<string, { title: string; action: string; reason
   'health-08': {
     title: '10-minute rhythm boost',
     action: 'Put on music and do 10 minutes of brisk walking or marching in place.',
-    reason: 'Rhythmic movement makes it easier to begin when motivation is low.',
+    reason: 'Rhythmic movement lowers drag when starting feels heavy.',
   },
   'health-09': {
     title: 'Stairs reset',
@@ -285,7 +285,7 @@ const EN_SUGGESTION_COPY: Record<string, { title: string; action: string; reason
   'language-04': {
     title: 'Listen and catch',
     action: 'Play a short foreign-language clip and note 3 expressions you understood.',
-    reason: 'Catching fragments keeps motivation alive better than chasing perfection.',
+    reason: 'Catching fragments keeps momentum alive better than chasing perfection.',
   },
   'language-05': {
     title: 'Voice note to yourself',
@@ -383,7 +383,7 @@ const EN_SPARKS = [
     body: 'Do not tire your mind. Put 3 clean choices in front of it and act.',
   },
   {
-    title: 'Speed can come before motivation.',
+    title: 'Speed can come before confidence.',
     body: 'Do not wait for inspiration. Decide in 10 seconds and start.',
   },
   {

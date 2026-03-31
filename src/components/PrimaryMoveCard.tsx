@@ -5,9 +5,15 @@ import { theme } from '../theme';
 
 interface PrimaryMoveCardProps {
   move: Suggestion;
+  kickerLabel: string;
   reason: string;
   todayGain: string;
   tomorrowGain: string;
+  commitLabel: string;
+  commitBody: string;
+  whyLabel: string;
+  todayLabel: string;
+  tomorrowLabel: string;
   streakLabel: string;
   levelLabel: string;
   primaryCta: string;
@@ -24,9 +30,15 @@ interface PrimaryMoveCardProps {
 
 export function PrimaryMoveCard({
   move,
+  kickerLabel,
   reason,
   todayGain,
   tomorrowGain,
+  commitLabel,
+  commitBody,
+  whyLabel,
+  todayLabel,
+  tomorrowLabel,
   streakLabel,
   levelLabel,
   primaryCta,
@@ -42,31 +54,32 @@ export function PrimaryMoveCard({
 }: PrimaryMoveCardProps) {
   return (
     <View style={styles.card}>
+      <View style={styles.topAccent} />
+
       <View style={styles.metaRow}>
-        <View style={styles.metaPill}>
-          <Text style={styles.metaText}>{streakLabel}</Text>
-        </View>
-        <View style={styles.metaPill}>
-          <Text style={styles.metaText}>{levelLabel}</Text>
-        </View>
+        <MetaChip label={streakLabel} />
+        <MetaChip label={levelLabel} />
       </View>
 
-      <Text style={styles.title}>{move.title}</Text>
-      <Text style={styles.action}>{move.action}</Text>
-
-      <View style={styles.copyBlock}>
-        <Text style={styles.label}>WHY THIS FITS</Text>
-        <Text style={styles.body}>{reason}</Text>
+      <View style={styles.heroBlock}>
+        <Text style={styles.kicker}>{kickerLabel}</Text>
+        <Text style={styles.title}>{move.title}</Text>
+        <Text style={styles.action}>{move.action}</Text>
       </View>
 
-      <View style={styles.copyBlock}>
-        <Text style={styles.label}>TODAY</Text>
-        <Text style={styles.body}>{todayGain}</Text>
+      <View style={styles.commitFrame}>
+        <Text style={styles.commitLabel}>{commitLabel}</Text>
+        <Text style={styles.commitBody}>{commitBody}</Text>
       </View>
 
-      <View style={styles.copyBlock}>
-        <Text style={styles.label}>TOMORROW</Text>
-        <Text style={styles.body}>{tomorrowGain}</Text>
+      <View style={styles.signalCard}>
+        <Text style={styles.signalLabel}>{whyLabel}</Text>
+        <Text style={styles.signalBody}>{reason}</Text>
+      </View>
+
+      <View style={styles.splitRow}>
+        <MiniPanel label={todayLabel} body={todayGain} emphasize />
+        <MiniPanel label={tomorrowLabel} body={tomorrowGain} />
       </View>
 
       <Pressable onPress={onStart} style={styles.primaryButton}>
@@ -82,14 +95,39 @@ export function PrimaryMoveCard({
         </Pressable>
       </View>
 
-      <View style={styles.secondaryRow}>
-        <Pressable onPress={onRefine} style={styles.linkButton}>
-          <Text style={styles.linkButtonText}>{tertiaryRefine}</Text>
+      <View style={styles.tertiaryRow}>
+        <Pressable onPress={onRefine} style={styles.tertiaryButton}>
+          <Text style={styles.tertiaryText}>{tertiaryRefine}</Text>
         </Pressable>
-        <Pressable onPress={onShare} style={styles.linkButton}>
-          <Text style={styles.linkButtonText}>{tertiaryShare}</Text>
+        <Pressable onPress={onShare} style={styles.tertiaryButton}>
+          <Text style={styles.tertiaryText}>{tertiaryShare}</Text>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+function MetaChip({ label }: { label: string }) {
+  return (
+    <View style={styles.metaChip}>
+      <Text style={styles.metaText}>{label}</Text>
+    </View>
+  );
+}
+
+function MiniPanel({
+  label,
+  body,
+  emphasize = false,
+}: {
+  label: string;
+  body: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <View style={[styles.miniPanel, emphasize ? styles.miniPanelStrong : null]}>
+      <Text style={styles.panelLabel}>{label}</Text>
+      <Text style={[styles.panelBody, emphasize ? styles.panelBodyStrong : null]}>{body}</Text>
     </View>
   );
 }
@@ -99,63 +137,145 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.md,
+    borderColor: theme.colors.borderStrong,
+    padding: theme.spacing.xl,
+    gap: theme.spacing.lg,
+    overflow: 'hidden',
     ...theme.shadow.card,
+  },
+  topAccent: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 5,
+    backgroundColor: theme.colors.accent,
   },
   metaRow: {
     flexDirection: 'row',
     gap: theme.spacing.sm,
   },
-  metaPill: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
+  metaChip: {
     borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceAlt,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   metaText: {
-    color: theme.colors.textMuted,
+    color: theme.colors.textSoft,
     fontSize: theme.typography.meta,
-    fontWeight: '700',
-    letterSpacing: 0.8,
+    fontWeight: '800',
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
+  },
+  heroBlock: {
+    gap: theme.spacing.sm,
+  },
+  kicker: {
+    color: theme.colors.accent,
+    fontSize: theme.typography.meta,
+    fontWeight: '800',
+    letterSpacing: 1.4,
   },
   title: {
     color: theme.colors.text,
     fontSize: theme.typography.display,
+    lineHeight: 46,
     fontWeight: '700',
-    lineHeight: 40,
+    letterSpacing: -1.1,
   },
   action: {
+    color: theme.colors.textMuted,
+    fontSize: 17,
+    lineHeight: 26,
+  },
+  commitFrame: {
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(212,162,76,0.28)',
+    backgroundColor: 'rgba(212,162,76,0.08)',
+    padding: theme.spacing.md,
+    gap: 8,
+    ...theme.shadow.gold,
+  },
+  commitLabel: {
+    color: theme.colors.accent,
+    fontSize: theme.typography.meta,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  commitBody: {
     color: theme.colors.text,
     fontSize: theme.typography.body,
-    lineHeight: 24,
+    lineHeight: 22,
+    fontWeight: '600',
   },
-  copyBlock: {
-    gap: 6,
+  signalCard: {
+    backgroundColor: theme.colors.surfaceAlt,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
-  label: {
+  signalLabel: {
     color: theme.colors.textSoft,
     fontSize: theme.typography.meta,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  signalBody: {
+    color: theme.colors.text,
+    fontSize: theme.typography.body,
+    lineHeight: 23,
+  },
+  splitRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  miniPanel: {
+    flex: 1,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: theme.spacing.md,
+    gap: 8,
+  },
+  miniPanelStrong: {
+    borderColor: 'rgba(212,162,76,0.22)',
+    backgroundColor: 'rgba(212,162,76,0.06)',
+  },
+  panelLabel: {
+    color: theme.colors.textSoft,
+    fontSize: theme.typography.meta,
+    fontWeight: '800',
     letterSpacing: 1,
   },
-  body: {
+  panelBody: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
     lineHeight: 22,
   },
+  panelBodyStrong: {
+    color: theme.colors.text,
+    fontWeight: '600',
+  },
   primaryButton: {
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.accent,
-    paddingVertical: 16,
+    paddingVertical: 19,
     alignItems: 'center',
+    ...theme.shadow.gold,
   },
   primaryButtonText: {
-    color: '#1b1202',
+    color: '#130d04',
     fontSize: theme.typography.body,
-    fontWeight: '800',
+    fontWeight: '900',
+    letterSpacing: 0.2,
   },
   secondaryRow: {
     flexDirection: 'row',
@@ -164,23 +284,29 @@ const styles = StyleSheet.create({
   secondaryButton: {
     flex: 1,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surfaceAlt,
-    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    paddingVertical: 15,
     alignItems: 'center',
+    backgroundColor: theme.colors.surfaceAlt,
   },
   secondaryButtonText: {
     color: theme.colors.text,
     fontSize: theme.typography.body,
     fontWeight: '700',
   },
-  linkButton: {
+  tertiaryRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  tertiaryButton: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
-  linkButtonText: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
-    fontWeight: '600',
+  tertiaryText: {
+    color: theme.colors.textSoft,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

@@ -25,9 +25,9 @@ export function SystemCard({
 }: SystemCardProps) {
   return (
     <Pressable onPress={onPress} style={[styles.card, { borderColor: `${accent}44` }]}>
-      <View style={[styles.accentBar, { backgroundColor: accent }]} />
       <View style={styles.header}>
         <View style={styles.headerCopy}>
+          <View style={[styles.accentBar, { backgroundColor: accent }]} />
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.promise}>{promise}</Text>
         </View>
@@ -37,9 +37,19 @@ export function SystemCard({
           </View>
         ) : null}
       </View>
-      <Text style={styles.metric}>{metric}</Text>
+
+      <View style={styles.metricRow}>
+        <View style={[styles.metricPill, { borderColor: `${accent}33` }]}>
+          <Text style={[styles.metric, { color: accent }]}>{metric}</Text>
+        </View>
+      </View>
+
       <Text style={styles.body}>{body}</Text>
-      <Text style={[styles.cta, { color: accent }]}>{cta}</Text>
+
+      <View style={styles.footer}>
+        <Text style={[styles.cta, { color: accent }]}>{cta}</Text>
+        <Text style={[styles.arrow, { color: accent }]}>→</Text>
+      </View>
     </Pressable>
   );
 }
@@ -50,12 +60,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  accentBar: {
-    width: 52,
-    height: 4,
-    borderRadius: theme.radius.pill,
+    gap: theme.spacing.md,
   },
   header: {
     flexDirection: 'row',
@@ -64,7 +69,12 @@ const styles = StyleSheet.create({
   },
   headerCopy: {
     flex: 1,
-    gap: 4,
+    gap: 6,
+  },
+  accentBar: {
+    width: 56,
+    height: 4,
+    borderRadius: theme.radius.pill,
   },
   title: {
     color: theme.colors.text,
@@ -74,6 +84,7 @@ const styles = StyleSheet.create({
   promise: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
+    lineHeight: 22,
   },
   activePill: {
     alignSelf: 'flex-start',
@@ -85,21 +96,39 @@ const styles = StyleSheet.create({
   activeText: {
     color: theme.colors.accent,
     fontSize: theme.typography.meta,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.8,
   },
+  metricRow: {
+    flexDirection: 'row',
+  },
+  metricPill: {
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+  },
   metric: {
-    color: theme.colors.text,
     fontSize: theme.typography.body,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   body: {
-    color: theme.colors.textMuted,
+    color: theme.colors.textSoft,
     fontSize: theme.typography.body,
     lineHeight: 22,
   },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   cta: {
     fontSize: theme.typography.body,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  arrow: {
+    fontSize: 18,
+    fontWeight: '900',
   },
 });

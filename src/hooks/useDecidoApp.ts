@@ -1,36 +1,58 @@
-import * as Haptics from 'expo-haptics';
+﻿import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Platform, Share } from 'react-native';
 
 import { SUGGESTIONS } from '../data/suggestions';
+import {
+  ANALYTICS_EVENTS,
+  buildAnalyticsSummary,
+  markFirstCompletion,
+  trackAnalyticsEvent,
+} from '../lib/analytics';
 import { localizeSuggestion } from '../lib/content';
-import { buildAnalyticsSummary, markFirstCompletion, trackAnalyticsEvent } from '../lib/analytics';
 import {
   applyContextAwareSuggestions,
-  buildDecisionFatigueReset,
+  buildRecoveryMove,
 } from '../lib/contextEngine';
-import {
-  countDailyRequests,
-  getTodayKey,
-  pickSuggestions,
-} from '../lib/decisionEngine';
+import { getTodayKey, pickSuggestions } from '../lib/decisionEngine';
 import { updateDecisionDnaScores } from '../lib/dnaScoring';
+import {
+  getDateKeyOffset,
+  getUserAccessState,
+  toLocalDateKey,
+} from '../lib/entitlements';
 import { buildFutureProjection } from '../lib/futureProjection';
 import { buildGuidance } from '../lib/guidance';
+import { buildBehaviorProfile } from '../lib/behaviorProfile';
 import {
   buildRecallNotification,
+  buildRecoveryNotification,
   buildStreakSaverNotification,
   ensureNotificationPermission,
   scheduleLocalNotification,
 } from '../lib/notificationEngine';
 import { assignPersonaFromAudit, buildPersonaProfile } from '../lib/persona';
+import { buildProgressSummary } from '../lib/progressInsights';
 import { buildGiftMovePayload, canSendGift, parseGiftMoveLink } from '../lib/referralEngine';
-import { getUiCopy } from '../lib/uiCopy';
 import { buildRewardProfile, buildRewardResult } from '../lib/rewardSystem';
-import { buildTrackCards } from '../lib/trackEngine';
 import { createDefaultAppData, loadAppData, saveAppData } from '../lib/storage';
+import { buildTrackCards } from '../lib/trackEngine';
+import { getUiCopy } from '../lib/uiCopy';
+import {
+  AppData,
+  AppTabKey,
+  CompletionState,
+  DecisionContext,
+  DecisionRecord,
+  Energy,
+  Friction,
+  Goal,
+  PaywallMode,
+  PlanTier,
+  Suggestion,
+  SystemId,
+} from '../types';
 import { useStoreBilling } from './useStoreBilling';
-import { AppData, AppTabKey, DecisionContext, DecisionRecord, Energy, Friction, Goal, PlanTier, Suggestion, SystemId } from '../types';
 
 const DEFAULT_CONTEXT: DecisionContext = {
   goal: 'finish',
@@ -52,21 +74,26 @@ interface FocusRunState {
   phase: 'prestart' | 'active' | 'halfway' | 'nearFinish' | 'score' | 'leaveConfirm';
   easyMode: boolean;
   usedGuidance: boolean;
+  committedAt: string | null;
+  isRecovery: boolean;
 }
 
-export function useDecidoApp() {
-  const billing = useStoreBilling();
-  const previousLivePlan = useRef<PlanTier>('free');
-  const [appData, setAppData] = useState<AppData>(createDefaultAppData());
-  const [loaded, setLoaded] = useState(false);
-  const [tab, setTab] = useState<AppTabKey>('today');
-  const [context, setContext] = useState<DecisionContext>(DEFAULT_CONTEXT);
-  const [selectedMoveId, setSelectedMoveId] = useState<string | null>(null);
-  const [forcedMove, setForcedMove] = useState<Suggestion | null>(null);
-  const [guidanceVisible, setGuidanceVisible] = useState(false);
-  const [paywallVisible, setPaywallVisible] = useState(false);
-  const [shareRecord, setShareRecord] = useState<DecisionRecord | null>(null);
-  const [focusRun, setFocusRun] = useState<FocusRunState>({
+interface PaywallState {
+  visible: boolean;
+  mode: PaywallMode;
+  source: string | null;
+}
+
+interface RecoveryPrompt {
+  title: string;
+  body: string;
+  cta: string;
+  source: 'abandon' | 'missed-day' | 'swap-fatigue';
+  premiumProtected: boolean;
+}
+
+function createEmptyFocusRun(): FocusRunState {
+  return {
     visible: false,
     move: null,
     steps: [],
@@ -76,14 +103,40 @@ export function useDecidoApp() {
     phase: 'prestart',
     easyMode: false,
     usedGuidance: false,
+    committedAt: null,
+    isRecovery: false,
+  };
+}
+
+export function useDecidoApp() {
+  const billing = useStoreBilling();
+  const previousLivePlan = useRef<PlanTier>('free');
+  const rewardEventRef = useRef<string | null>(null);
+  const recoveryPromptRef = useRef<string | null>(null);
+  const shownMoveRef = useRef<string | null>(null);
+
+  const [appData, setAppData] = useState<AppData>(createDefaultAppData());
+  const [loaded, setLoaded] = useState(false);
+  const [tab, setTab] = useState<AppTabKey>('today');
+  const [context, setContext] = useState<DecisionContext>(DEFAULT_CONTEXT);
+  const [selectedMoveId, setSelectedMoveId] = useState<string | null>(null);
+  const [forcedMove, setForcedMove] = useState<Suggestion | null>(null);
+  const [guidanceVisible, setGuidanceVisible] = useState(false);
+  const [paywallState, setPaywallState] = useState<PaywallState>({
+    visible: false,
+    mode: 'soft-success',
+    source: null,
   });
+  const [shareRecord, setShareRecord] = useState<DecisionRecord | null>(null);
+  const [shareVariant, setShareVariant] = useState<'completion' | 'recovery' | 'streak' | 'preview'>('preview');
+  const [focusRun, setFocusRun] = useState<FocusRunState>(createEmptyFocusRun());
   const [reward, setReward] = useState<{
     xpGain: number;
     levelBefore: string;
     levelAfter: string;
     message: string;
   } | null>(null);
-  const [pendingPaywall, setPendingPaywall] = useState(false);
+  const [pendingSoftPaywall, setPendingSoftPaywall] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [onboardingGoal, setOnboardingGoal] = useState<Goal | null>(null);
   const [onboardingFriction, setOnboardingFriction] = useState<Friction | null>(null);
@@ -93,49 +146,27 @@ export function useDecidoApp() {
 
   useEffect(() => {
     loadAppData().then((data) => {
-      const todayKey = getTodayKey();
-      const nextData =
-        data.usage.dateKey === todayKey
-          ? data
-          : {
-              ...data,
-              usage: {
-                dateKey: todayKey,
-                swapsUsed: 0,
-                paywallSeen: false,
-              },
-            };
-      setAppData(nextData);
+      setAppData(data);
       setLoaded(true);
     });
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    saveAppData(appData);
+    void saveAppData(appData);
   }, [appData, loaded]);
 
   useEffect(() => {
     if (!loaded) return;
-    setAppData((current) => ({
-      ...current,
-      analytics: trackAnalyticsEvent(current.analytics, 'app_open'),
-    }));
-  }, [loaded]);
 
-  useEffect(() => {
-    if (!loaded || !paywallVisible) return;
     setAppData((current) => ({
       ...current,
-      usage: {
-        ...current.usage,
-        paywallSeen: true,
-      },
-      analytics: trackAnalyticsEvent(current.analytics, 'paywall_view', {
+      firstActivatedAt: current.firstActivatedAt ?? new Date().toISOString(),
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.appOpen, {
         plan: current.subscription.plan,
       }),
     }));
-  }, [loaded, paywallVisible]);
+  }, [loaded]);
 
   useEffect(() => {
     if (!loaded || !billing.hasLiveStore) return;
@@ -143,7 +174,7 @@ export function useDecidoApp() {
     if (previousLivePlan.current === 'free' && billing.currentPlan !== 'free') {
       setAppData((current) => ({
         ...current,
-        analytics: trackAnalyticsEvent(current.analytics, 'purchase_success', {
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.purchaseCompleted, {
           plan: billing.currentPlan,
           source: 'app-store',
         }),
@@ -154,8 +185,8 @@ export function useDecidoApp() {
     if (appData.subscription.plan === billing.currentPlan) return;
 
     if (billing.currentPlan !== 'free') {
-      setPaywallVisible(false);
-      setPendingPaywall(false);
+      setPaywallState((current) => ({ ...current, visible: false }));
+      setPendingSoftPaywall(false);
     }
 
     setAppData((current) => ({
@@ -204,20 +235,6 @@ export function useDecidoApp() {
   }, [focusRun.phase, focusRun.visible]);
 
   useEffect(() => {
-    if (!loaded || appData.notifications.permission !== 'unknown') return;
-
-    void ensureNotificationPermission().then((permission) => {
-      setAppData((current) => ({
-        ...current,
-        notifications: {
-          ...current.notifications,
-          permission,
-        },
-      }));
-    });
-  }, [appData.notifications.permission, loaded]);
-
-  useEffect(() => {
     if (!loaded) return;
 
     const redeemGiftLink = (url: string | null) => {
@@ -238,7 +255,7 @@ export function useDecidoApp() {
           ...current.gifting,
           lastReceivedCode: parsed.code,
         },
-        analytics: trackAnalyticsEvent(current.analytics, 'gift_redeemed', {
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.giftRedeemed, {
           code: parsed.code,
           moveId: parsed.moveId,
           sender: parsed.sender,
@@ -248,12 +265,18 @@ export function useDecidoApp() {
 
     void Linking.getInitialURL().then(redeemGiftLink);
     const subscription = Linking.addEventListener('url', ({ url }) => redeemGiftLink(url));
-
     return () => subscription.remove();
   }, [appData.gifting.lastReceivedCode, appData.language, loaded]);
 
   const copy = useMemo(() => getUiCopy(appData.language), [appData.language]);
-  const todayKey = getTodayKey();
+  const todayKey = toLocalDateKey();
+  const accessState = useMemo(() => getUserAccessState(appData), [appData]);
+  const entitlements = accessState.entitlements;
+  const completedMoves = useMemo(
+    () => appData.decisions.filter((decision) => decision.completion === 'done').length,
+    [appData.decisions]
+  );
+
   const trackCards = useMemo(
     () => buildTrackCards(appData.decisions, appData.language),
     [appData.decisions, appData.language]
@@ -263,6 +286,7 @@ export function useDecidoApp() {
   useEffect(() => {
     if (!activeTrack) return;
     setContext((current) => ({
+      ...current,
       ...activeTrack.context,
       goal: current.goal,
       friction: current.friction,
@@ -277,23 +301,12 @@ export function useDecidoApp() {
     );
     return applyContextAwareSuggestions(localized, context, appData.language);
   }, [appData.decisions, appData.language, context]);
-  const suggestions = contextAwareResult.suggestions;
 
+  const suggestions = contextAwareResult.suggestions;
   const selectedMove =
     suggestions.find((suggestion) => suggestion.id === selectedMoveId) ?? suggestions[0] ?? null;
   const activeMove = forcedMove ?? selectedMove;
   const alternatives = suggestions.filter((suggestion) => suggestion.id !== activeMove?.id);
-
-  useEffect(() => {
-    if (!loaded || !guidanceVisible || !activeMove) return;
-    setAppData((current) => ({
-      ...current,
-      analytics: trackAnalyticsEvent(current.analytics, 'guidance_open', {
-        moveId: activeMove.id,
-        system: current.currentSystem,
-      }),
-    }));
-  }, [activeMove, guidanceVisible, loaded]);
 
   useEffect(() => {
     if (!selectedMove && suggestions[0] && !forcedMove) {
@@ -306,7 +319,18 @@ export function useDecidoApp() {
     }
   }, [forcedMove, selectedMove, suggestions]);
 
-  const guidance = useMemo(() => {
+  useEffect(() => {
+    if (!loaded || !guidanceVisible || !activeMove) return;
+    setAppData((current) => ({
+      ...current,
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.guidanceOpened, {
+        moveId: activeMove.id,
+        system: current.currentSystem,
+      }),
+    }));
+  }, [activeMove, guidanceVisible, loaded]);
+
+  const fullGuidance = useMemo(() => {
     if (!activeMove) return null;
     return buildGuidance(
       activeMove,
@@ -315,25 +339,40 @@ export function useDecidoApp() {
       appData.decisions,
       appData.persona
     );
-  }, [activeMove, context, appData.language, appData.decisions, appData.persona]);
+  }, [activeMove, context, appData.decisions, appData.language, appData.persona]);
+
+  const guidance = useMemo(() => {
+    if (!fullGuidance) return null;
+    if (entitlements.guidanceTier === 'full') return fullGuidance;
+    return {
+      ...fullGuidance,
+      steps: fullGuidance.steps.slice(0, 2),
+      tinyLesson: '',
+      expectedOutcome: '',
+      continueTomorrow: '',
+    };
+  }, [entitlements.guidanceTier, fullGuidance]);
 
   const projection = useMemo(() => {
     if (!activeMove) return null;
     return buildFutureProjection(context, activeMove, appData.decisions, appData.language);
-  }, [activeMove, context, appData.decisions, appData.language]);
+  }, [activeMove, appData.decisions, appData.language, context]);
 
   const rewardProfile = useMemo(
     () => buildRewardProfile(appData.decisions, appData.language),
     [appData.decisions, appData.language]
+  );
+  const progressSummary = useMemo(
+    () => buildProgressSummary(appData.decisions, appData.recovery, appData.language),
+    [appData.decisions, appData.language, appData.recovery]
   );
   const personaProfile = useMemo(
     () =>
       appData.persona
         ? buildPersonaProfile(appData.persona, appData.language, context.goal)
         : null,
-    [appData.persona, appData.language, context.goal]
+    [appData.language, appData.persona, context.goal]
   );
-
   const completedDoneDateKeys = useMemo(
     () =>
       Array.from(
@@ -353,20 +392,23 @@ export function useDecidoApp() {
     let count = 0;
     const protectedSet = new Set(protectedDateKeys);
     const cursor = new Date();
+
     while (true) {
-      const key = cursor.toISOString().slice(0, 10);
+      const key = toLocalDateKey(cursor);
       if (!protectedSet.has(key)) break;
       count += 1;
       cursor.setDate(cursor.getDate() - 1);
     }
+
     return count;
   }, [protectedDateKeys]);
 
-  const dnaCards = useMemo(
-    () => buildSimpleDnaCards(appData.decisions, appData.dnaScores),
-    [appData.decisions, appData.dnaScores]
+  const completedToday = completedDoneDateKeys.includes(todayKey);
+  const streakSaverEligible = entitlements.streakProtection && streak > 0 && !completedToday;
+  const behaviorProfile = useMemo(
+    () => buildBehaviorProfile(appData.decisions, appData.recovery, streak, appData.language),
+    [appData.decisions, appData.language, appData.recovery, streak]
   );
-  const weeklySummary = useMemo(() => buildSimpleWeeklySummary(appData.decisions), [appData.decisions]);
   const analyticsSummary = useMemo(
     () => buildAnalyticsSummary(appData.analytics),
     [appData.analytics]
@@ -379,22 +421,27 @@ export function useDecidoApp() {
     () => appData.decisions.filter((decision) => decision.reviewedAt).slice(0, 5),
     [appData.decisions]
   );
-
-  const countToday = countDailyRequests(appData.decisions, todayKey);
-  const isFree = appData.subscription.plan === 'free';
-  const isPro = !isFree;
-  const completedToday = completedDoneDateKeys.includes(todayKey);
-  const movesRemaining = isFree ? Math.max(1 - countToday, 0) : 999;
-  const streakSaverEligible = isPro && streak > 0 && !completedToday;
-  const streakSaverMove = useMemo(
-    () => buildDecisionFatigueReset(appData.language),
-    [appData.language]
+  const dnaCards = useMemo(
+    () =>
+      buildSimpleDnaCards(
+        appData.decisions,
+        appData.dnaScores,
+        appData.language,
+        entitlements.premiumInsights
+      ),
+    [appData.decisions, appData.dnaScores, appData.language, entitlements.premiumInsights]
+  );
+  const weeklySummary = useMemo(
+    () => buildSimpleWeeklySummary(appData.decisions, appData.language),
+    [appData.decisions, appData.language]
   );
   const shareGiftPreview = useMemo(() => {
     const shareMove = shareRecord?.selectedSuggestion ?? activeMove;
-    if (!shareMove || !isPro || !canSendGift(appData.gifting.sentCodes)) return null;
+    if (!shareMove || !entitlements.isPremium || !canSendGift(appData.gifting.sentCodes)) {
+      return null;
+    }
     return buildGiftMovePayload(shareMove, appData.language);
-  }, [activeMove, appData.gifting.sentCodes, appData.language, isPro, shareRecord]);
+  }, [activeMove, appData.gifting.sentCodes, appData.language, entitlements.isPremium, shareRecord]);
 
   const focusRunView = useMemo(() => {
     if (!focusRun.visible) return focusRun;
@@ -411,13 +458,191 @@ export function useDecidoApp() {
   }, [focusRun]);
 
   const todayGain = guidance?.whatYouGain ?? activeMove?.reason ?? '';
-  const tomorrowGain = guidance?.continueTomorrow ?? projection?.teaser ?? '';
-  const tonightLine = pending.length
-    ? `${pending.length} move waiting for a score tonight.`
-    : 'Score one move tonight to keep tomorrow sharp.';
+  const tomorrowGain = guidance?.continueTomorrow || projection?.teaser || '';
+  const tonightLine = buildTonightLine(appData.language, pending.length, progressSummary.completionRate);
+  const softPaywallBody = copy.paywall.momentumAngle;
+  const hardPaywallBody = copy.paywall.accessAngle;
 
   useEffect(() => {
-    if (!loaded || !isPro) return;
+    if (!loaded || !activeMove) return;
+
+    const moveKey = `${todayKey}:${activeMove.id}:${context.goal}:${context.friction}:${appData.currentSystem}`;
+    if (shownMoveRef.current === moveKey) return;
+    shownMoveRef.current = moveKey;
+
+    setAppData((current) => ({
+      ...current,
+      analytics: trackAnalyticsEvent(
+        current.analytics,
+        current.decisions.length === 0
+          ? ANALYTICS_EVENTS.firstMoveShown
+          : entitlements.isActivationPhase
+            ? ANALYTICS_EVENTS.activationMoveShown
+            : ANALYTICS_EVENTS.moveShown,
+        {
+          moveId: activeMove.id,
+          system: current.currentSystem,
+          phase: entitlements.phase,
+        }
+      ),
+    }));
+  }, [
+    activeMove,
+    appData.currentSystem,
+    context.friction,
+    context.goal,
+    entitlements.isActivationPhase,
+    entitlements.phase,
+    loaded,
+    todayKey,
+  ]);
+
+  const recoveryPrompt = useMemo<RecoveryPrompt | null>(() => {
+    const latest = appData.decisions[0];
+
+    if (latest?.dateKey === todayKey && latest.focusRunOutcome === 'abandoned' && !completedToday) {
+      return {
+        title: copy.helpers.recoveryTitle('cracked'),
+        body:
+          appData.language === 'tr'
+            ? '2 dakikalik bir reset ile bugunu tamamen kaybetmeden geri don.'
+            : 'Recover with a 2-minute reset before today fully slips.',
+        cta: copy.helpers.recoveryCta('reset'),
+        source: 'abandon',
+        premiumProtected: entitlements.premiumRecovery,
+      };
+    }
+
+    if (consecutiveSwaps >= 2) {
+      return {
+        title: copy.helpers.recoveryTitle('fatigue'),
+        body:
+          appData.language === 'tr'
+            ? 'Bir hamle daha degistirmek yerine kisa reset yap. Secim kalitesi toparlanir.'
+            : 'Reset before swapping again. Your move quality will come back cleaner.',
+        cta: copy.helpers.recoveryCta('reset'),
+        source: 'swap-fatigue',
+        premiumProtected: entitlements.premiumRecovery,
+      };
+    }
+
+    if (!completedToday && streak > 0) {
+      return {
+        title: copy.helpers.recoveryTitle('salvage'),
+        body:
+          appData.language === 'tr'
+            ? 'Kisa bir reset hamlesi bugunu kapatmana ve ritmi korumana yardim eder.'
+            : 'A short reset move can still protect the day and keep rhythm alive.',
+        cta: copy.helpers.recoveryCta('save'),
+        source: 'missed-day',
+        premiumProtected: entitlements.streakProtection,
+      };
+    }
+
+    return null;
+  }, [
+    copy.helpers,
+    appData.decisions,
+    appData.language,
+    completedToday,
+    consecutiveSwaps,
+    entitlements.premiumRecovery,
+    entitlements.streakProtection,
+    streak,
+    todayKey,
+  ]);
+
+  useEffect(() => {
+    if (!loaded || !reward) return;
+    const rewardKey = `${reward.levelAfter}:${reward.xpGain}:${appData.decisions[0]?.id ?? 'none'}`;
+    if (rewardEventRef.current === rewardKey) return;
+    rewardEventRef.current = rewardKey;
+    setAppData((current) => ({
+      ...current,
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.rewardViewed, {
+        levelAfter: reward.levelAfter,
+        xpGain: reward.xpGain,
+      }),
+    }));
+  }, [appData.decisions, loaded, reward]);
+
+  useEffect(() => {
+    if (!loaded || !recoveryPrompt) return;
+    const promptKey = `${todayKey}:${recoveryPrompt.source}`;
+    if (recoveryPromptRef.current === promptKey) return;
+    recoveryPromptRef.current = promptKey;
+    setAppData((current) => ({
+      ...current,
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.recoveryPromptSeen, {
+        source: recoveryPrompt.source,
+        premiumProtected: recoveryPrompt.premiumProtected,
+      }),
+    }));
+  }, [loaded, recoveryPrompt, todayKey]);
+
+  useEffect(() => {
+    if (!loaded || !entitlements.streakProtection || !streakSaverEligible) return;
+    if (appData.notifications.permission !== 'granted') return;
+    if (appData.notifications.lastStreakSaverDateKey === todayKey) return;
+
+    const payload = buildStreakSaverNotification(appData.language, todayKey);
+    void scheduleLocalNotification(payload).then((notificationId) => {
+      setAppData((current) => ({
+        ...current,
+        notifications: {
+          ...current.notifications,
+          lastStreakSaverDateKey: todayKey,
+          lastStreakSaverScheduledAt: payload.date.toISOString(),
+          lastStreakSaverNotificationId: notificationId,
+        },
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.notificationScheduled, {
+          type: payload.type,
+          dateKey: todayKey,
+        }),
+      }));
+    });
+  }, [
+    appData.language,
+    appData.notifications.lastStreakSaverDateKey,
+    appData.notifications.permission,
+    entitlements.streakProtection,
+    loaded,
+    streakSaverEligible,
+    todayKey,
+  ]);
+
+  useEffect(() => {
+    if (!loaded || !recoveryPrompt) return;
+    if (appData.notifications.permission !== 'granted') return;
+    if (appData.notifications.lastRecoveryDateKey === todayKey) return;
+
+    const payload = buildRecoveryNotification(appData.language, todayKey);
+    void scheduleLocalNotification(payload).then((notificationId) => {
+      setAppData((current) => ({
+        ...current,
+        notifications: {
+          ...current.notifications,
+          lastRecoveryDateKey: todayKey,
+          lastRecoveryScheduledAt: payload.date.toISOString(),
+          lastRecoveryNotificationId: notificationId,
+        },
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.notificationScheduled, {
+          type: payload.type,
+          dateKey: todayKey,
+        }),
+      }));
+    });
+  }, [
+    appData.language,
+    appData.notifications.lastRecoveryDateKey,
+    appData.notifications.permission,
+    loaded,
+    recoveryPrompt,
+    todayKey,
+  ]);
+
+  useEffect(() => {
+    if (!loaded || !entitlements.streakProtection) return;
 
     const yesterdayKey = getDateKeyOffset(-1);
     const twoDaysAgoKey = getDateKeyOffset(-2);
@@ -438,37 +663,97 @@ export function useDecidoApp() {
         savedDateKeys: Array.from(new Set([...current.streakFreeze.savedDateKeys, yesterdayKey])),
         lastProtectedDateKey: yesterdayKey,
       },
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.streakSaverUsed, {
+        dateKey: yesterdayKey,
+      }),
     }));
   }, [
     appData.streakFreeze.credits,
     appData.streakFreeze.lastProtectedDateKey,
-    isPro,
+    entitlements.streakProtection,
     loaded,
     protectedDateKeys,
   ]);
 
-  useEffect(() => {
-    if (!loaded || !streakSaverEligible) return;
-    if (appData.notifications.permission !== 'granted') return;
-    if (appData.notifications.lastStreakSaverDateKey === todayKey) return;
+  async function requestNotificationsIfNeeded(reason: 'completion' | 'recovery') {
+    if (appData.notifications.permission === 'granted') return 'granted' as const;
+    if (appData.notifications.permission === 'denied') return 'denied' as const;
 
-    const payload = buildStreakSaverNotification(appData.language);
-    void scheduleLocalNotification(payload);
     setAppData((current) => ({
       ...current,
       notifications: {
         ...current.notifications,
-        lastStreakSaverDateKey: todayKey,
+        lastPermissionRequestedAt: new Date().toISOString(),
       },
+      analytics: trackAnalyticsEvent(
+        current.analytics,
+        ANALYTICS_EVENTS.notificationPermissionRequested,
+        { reason }
+      ),
     }));
-  }, [
-    appData.language,
-    appData.notifications.lastStreakSaverDateKey,
-    appData.notifications.permission,
-    loaded,
-    streakSaverEligible,
-    todayKey,
-  ]);
+
+    const result = await ensureNotificationPermission();
+
+    setAppData((current) => ({
+      ...current,
+      notifications: {
+        ...current.notifications,
+        permission: result.permission,
+        lastPermissionResolvedAt: new Date().toISOString(),
+      },
+      analytics: trackAnalyticsEvent(
+        current.analytics,
+        result.permission === 'granted'
+          ? ANALYTICS_EVENTS.notificationPermissionGranted
+          : ANALYTICS_EVENTS.notificationPermissionDenied,
+        { reason }
+      ),
+    }));
+
+    return result.permission;
+  }
+
+  function showPaywall(mode: PaywallMode, source: string) {
+    setPaywallState({
+      visible: true,
+      mode,
+      source,
+    });
+    setAppData((current) => ({
+      ...current,
+      usage: {
+        ...current.usage,
+        paywallSeen: true,
+        softPaywallSeenAt:
+          mode === 'soft-success' ? new Date().toISOString() : current.usage.softPaywallSeenAt,
+        hardPaywallSeenAt:
+          mode === 'hard-access' ? new Date().toISOString() : current.usage.hardPaywallSeenAt,
+      },
+      analytics: trackAnalyticsEvent(
+        trackAnalyticsEvent(
+          current.analytics,
+          mode === 'soft-success'
+            ? ANALYTICS_EVENTS.softPaywallViewed
+            : ANALYTICS_EVENTS.hardPaywallViewed,
+          {
+            source,
+            plan: current.subscription.plan,
+            variant: mode === 'soft-success' ? 'momentum' : 'access',
+          }
+        ),
+        ANALYTICS_EVENTS.premiumGateSeen,
+        {
+          source,
+          plan: current.subscription.plan,
+          mode,
+        }
+      ),
+    }));
+  }
+
+  function closePaywall() {
+    setPaywallState((current) => ({ ...current, visible: false }));
+  }
 
   function completeOnboarding(startAfter = false, openWhy = false) {
     const nextContext: DecisionContext = {
@@ -485,19 +770,23 @@ export function useDecidoApp() {
       onboardingMinutes ?? context.minutes,
       appData.language
     );
+    const now = new Date().toISOString();
 
     setContext(nextContext);
     setAppData((current) => ({
       ...current,
       onboardingDone: true,
+      onboardingCompletedAt: current.onboardingCompletedAt ?? now,
+      firstActivatedAt: current.firstActivatedAt ?? now,
       persona: persona.id,
-      analytics: trackAnalyticsEvent(current.analytics, 'onboarding_complete', {
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.onboardingComplete, {
         goal: nextContext.goal,
         friction: nextContext.friction,
         minutes: nextContext.minutes,
         energy: nextContext.energy,
       }),
     }));
+
     if (openWhy) {
       setGuidanceVisible(true);
     }
@@ -509,8 +798,15 @@ export function useDecidoApp() {
   function startFocusRun(usedGuidance = false) {
     const move = forcedMove ?? selectedMove;
     if (!move) return;
-    if (isFree && countToday >= 1) {
-      setPaywallVisible(true);
+
+    if (accessState.hasHitMoveLimit) {
+      setAppData((current) => ({
+        ...current,
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.moveLimitHit, {
+          phase: entitlements.phase,
+        }),
+      }));
+      showPaywall(completedMoves >= 1 ? 'hard-access' : 'soft-success', 'move-limit');
       return;
     }
 
@@ -533,37 +829,52 @@ export function useDecidoApp() {
       phase: 'prestart',
       easyMode: false,
       usedGuidance,
+      committedAt: null,
+      isRecovery: move.id === 'reset-micro-meditation',
     });
-    setAppData((current) => ({
-      ...current,
-      analytics: trackAnalyticsEvent(current.analytics, 'move_presented', {
-        moveId: move.id,
-        usedGuidance,
-        system: current.currentSystem,
-      }),
-    }));
     setForcedMove(null);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
   function beginFocusRun() {
+    if (!focusRun.move) return;
+
+    const nowIso = new Date().toISOString();
     setAppData((current) => ({
       ...current,
-      analytics: trackAnalyticsEvent(current.analytics, 'focus_run_started', {
-        moveId: focusRun.move?.id ?? null,
-        system: current.currentSystem,
-      }),
+      usage: {
+        ...current.usage,
+        dateKey: todayKey,
+        movesUsed: accessState.movesUsedToday + 1,
+        focusRunsStarted: accessState.focusRunsStartedToday + 1,
+      },
+      analytics: trackAnalyticsEvent(
+        trackAnalyticsEvent(
+          current.analytics,
+          ANALYTICS_EVENTS.focusRunStarted,
+          {
+            moveId: focusRun.move?.id ?? null,
+            system: current.currentSystem,
+            recovery: focusRun.isRecovery,
+          }
+        ),
+        completedMoves === 0 ? ANALYTICS_EVENTS.firstMoveStarted : ANALYTICS_EVENTS.moveStarted,
+        {
+          moveId: focusRun.move?.id ?? null,
+          system: current.currentSystem,
+        }
+      ),
     }));
-    setFocusRun((current) => ({ ...current, phase: 'active' }));
+    setFocusRun((current) => ({ ...current, phase: 'active', committedAt: nowIso }));
   }
 
   function makeFocusRunEasier() {
     setFocusRun((current) => ({
       ...current,
       easyMode: true,
-      totalSeconds: 120,
+      totalSeconds: Math.min(current.totalSeconds, 120),
       secondsLeft: Math.min(current.secondsLeft, 120),
-      steps: current.steps.slice(0, Math.min(2, current.steps.length)),
+      steps: current.steps.slice(0, Math.max(1, Math.min(2, current.steps.length))),
       currentStep: 0,
       phase: current.phase === 'leaveConfirm' ? 'active' : current.phase,
     }));
@@ -587,11 +898,9 @@ export function useDecidoApp() {
     setFocusRun((current) => ({ ...current, phase: 'active' }));
   }
 
-  function scoreFocusRun(score: 1 | 2 | 3 | 4 | 5) {
+  async function scoreFocusRun(score: 1 | 2 | 3 | 4 | 5) {
     if (!focusRun.move) return;
-    const completedMove = focusRun.move;
     const actualSeconds = focusRun.totalSeconds - focusRun.secondsLeft;
-
     const record: DecisionRecord = {
       id: `${Date.now()}`,
       createdAt: new Date().toISOString(),
@@ -605,6 +914,9 @@ export function useDecidoApp() {
       reviewedAt: new Date().toISOString(),
       executionSeconds: actualSeconds,
       usedGuidance: focusRun.usedGuidance,
+      isRecoveryMove: focusRun.isRecovery,
+      swapCountBeforeSelection: consecutiveSwaps,
+      focusRunOutcome: 'completed',
     };
 
     const rewardResult = buildRewardResult(appData.decisions, 'done', score, appData.language);
@@ -621,54 +933,88 @@ export function useDecidoApp() {
       ...current,
       decisions: nextDecisions,
       dnaScores,
+      recovery: focusRun.isRecovery
+        ? {
+            ...current.recovery,
+            completedCount: current.recovery.completedCount + 1,
+            lastRecoveryCompletedAt: new Date().toISOString(),
+          }
+        : current.recovery,
       analytics: trackAnalyticsEvent(
-        markFirstCompletion(current.analytics),
-        'move_completed',
+        trackAnalyticsEvent(
+          markFirstCompletion(current.analytics),
+          ANALYTICS_EVENTS.focusRunCompleted,
+          {
+            moveId: record.selectedSuggestion.id,
+            executionSeconds: actualSeconds,
+            recovery: focusRun.isRecovery,
+          }
+        ),
+        doneCount === 1 ? ANALYTICS_EVENTS.firstMoveCompleted : ANALYTICS_EVENTS.moveCompleted,
         {
           moveId: record.selectedSuggestion.id,
           score,
-          executionSeconds: actualSeconds,
           usedGuidance: focusRun.usedGuidance,
           system: current.currentSystem,
+          recovery: focusRun.isRecovery,
         }
       ),
     }));
-    setFocusRun({
-      visible: false,
-      move: null,
-      steps: [],
-      totalSeconds: 0,
-      secondsLeft: 0,
-      currentStep: 0,
-      phase: 'prestart',
-      easyMode: false,
-      usedGuidance: false,
-    });
+
+    setFocusRun(createEmptyFocusRun());
     setReward(rewardResult);
     setShareRecord(record);
     setTab('progress');
     setConsecutiveSwaps(0);
     setForcedMove(null);
-    if (isFree && doneCount >= 2) {
-      setPendingPaywall(true);
+
+    if (!entitlements.isPremium && !entitlements.isActivationPhase && doneCount >= 1 && !appData.usage.softPaywallSeenAt) {
+      setPendingSoftPaywall(true);
     }
-    if (appData.notifications.permission === 'granted') {
-      const recall = buildRecallNotification(completedMove.title, appData.language);
-      void scheduleLocalNotification(recall);
+
+    const permission = await requestNotificationsIfNeeded('completion');
+    if (permission === 'granted') {
+      const recall = buildRecallNotification(
+        record.selectedSuggestion.id,
+        record.selectedSuggestion.title,
+        appData.language
+      );
+      const notificationId = await scheduleLocalNotification(recall);
       setAppData((current) => ({
         ...current,
         notifications: {
           ...current.notifications,
-          lastRecallMoveId: completedMove.id,
+          lastRecallMoveId: record.selectedSuggestion.id,
           lastRecallAt: recall.date.toISOString(),
+          lastRecallNotificationId: notificationId,
         },
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.notificationScheduled, {
+          type: recall.type,
+          moveId: record.selectedSuggestion.id,
+        }),
       }));
     }
+
+    if (focusRun.isRecovery) {
+      setAppData((current) => ({
+        ...current,
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.recoveryCompleted, {
+          source: current.recovery.lastRecoverySource,
+        }),
+      }));
+    }
+
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   function leaveFocusRunAnyway() {
     if (!focusRun.move) return;
+
+    const actualSeconds = focusRun.totalSeconds - focusRun.secondsLeft;
+    const progressRatio = actualSeconds / Math.max(focusRun.totalSeconds, 1);
+    const completion: CompletionState =
+      progressRatio >= 0.35 || focusRun.currentStep > 0 ? 'partial' : 'skipped';
+    const resultScore = completion === 'partial' ? 2 : 1;
 
     const record: DecisionRecord = {
       id: `${Date.now()}`,
@@ -677,49 +1023,99 @@ export function useDecidoApp() {
       context,
       options: suggestions,
       selectedSuggestion: focusRun.move,
-      completion: 'skipped',
-      resultScore: 1,
+      completion,
+      resultScore,
       reflection: '',
       reviewedAt: new Date().toISOString(),
-      executionSeconds: focusRun.totalSeconds - focusRun.secondsLeft,
+      executionSeconds: actualSeconds,
       usedGuidance: focusRun.usedGuidance,
+      isRecoveryMove: focusRun.isRecovery,
+      swapCountBeforeSelection: consecutiveSwaps,
+      focusRunOutcome: completion === 'partial' ? 'partial' : 'abandoned',
     };
 
     setAppData((current) => ({
       ...current,
       decisions: [record, ...current.decisions],
-      analytics: trackAnalyticsEvent(current.analytics, 'move_skipped', {
-        moveId: record.selectedSuggestion.id,
-        system: current.currentSystem,
-      }),
+      recovery: {
+        ...current.recovery,
+        lastRecoveryPromptAt: new Date().toISOString(),
+        lastRecoverySource: 'abandon',
+        triggeredCount: current.recovery.triggeredCount + 1,
+        abandonedCount: current.recovery.abandonedCount + 1,
+      },
+      analytics: trackAnalyticsEvent(
+        trackAnalyticsEvent(
+          current.analytics,
+          completion === 'partial'
+            ? ANALYTICS_EVENTS.focusRunPartial
+            : ANALYTICS_EVENTS.focusRunAbandoned,
+          {
+            moveId: record.selectedSuggestion.id,
+            executionSeconds: actualSeconds,
+          }
+        ),
+        completion === 'partial' ? ANALYTICS_EVENTS.recoveryTriggered : ANALYTICS_EVENTS.moveSkipped,
+        {
+          moveId: record.selectedSuggestion.id,
+          source: 'abandon',
+        }
+      ),
     }));
-    setFocusRun({
-      visible: false,
-      move: null,
-      steps: [],
-      totalSeconds: 0,
-      secondsLeft: 0,
-      currentStep: 0,
-      phase: 'prestart',
-      easyMode: false,
-      usedGuidance: false,
-    });
+
+    setFocusRun(createEmptyFocusRun());
     setForcedMove(null);
+    setGuidanceVisible(false);
+    setTab('today');
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }
+
+  function startRecoveryMove(source: RecoveryPrompt['source']) {
+    const resetMove = buildRecoveryMove(appData.language, source);
+    setForcedMove(resetMove);
+    setGuidanceVisible(true);
+    setTab('today');
+    setConsecutiveSwaps(0);
+    setAppData((current) => ({
+      ...current,
+      recovery: {
+        ...current.recovery,
+        lastRecoveryPromptAt: new Date().toISOString(),
+        lastRecoverySource: source,
+        triggeredCount: current.recovery.triggeredCount + 1,
+      },
+      usage: {
+        ...current.usage,
+        dateKey: todayKey,
+        recoveriesUsed: current.usage.dateKey === todayKey ? current.usage.recoveriesUsed + 1 : 1,
+      },
+      analytics: trackAnalyticsEvent(
+        trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.recoveryTriggered, {
+          source,
+        }),
+        ANALYTICS_EVENTS.recoveryAccepted,
+        {
+          source,
+        }
+      ),
+    }));
   }
 
   function swapMove() {
     if (!alternatives.length) return;
-    if (isFree && appData.usage.dateKey === todayKey && appData.usage.swapsUsed >= 3) {
-      setPaywallVisible(true);
+    if (accessState.hasHitSwapLimit) {
+      setAppData((current) => ({
+        ...current,
+        analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.swapLimitHit, {
+          phase: entitlements.phase,
+        }),
+      }));
+      showPaywall(completedMoves >= 1 ? 'hard-access' : 'soft-success', 'swap-limit');
       return;
     }
 
     if (consecutiveSwaps >= 2) {
-      const resetMove = buildDecisionFatigueReset(appData.language);
-      setForcedMove(resetMove);
-      setGuidanceVisible(true);
-      setConsecutiveSwaps(0);
+      startRecoveryMove('swap-fatigue');
       return;
     }
 
@@ -732,9 +1128,9 @@ export function useDecidoApp() {
       usage: {
         ...current.usage,
         dateKey: todayKey,
-        swapsUsed: current.usage.dateKey === todayKey ? current.usage.swapsUsed + 1 : 1,
+        swapsUsed: accessState.swapsUsedToday + 1,
       },
-      analytics: trackAnalyticsEvent(current.analytics, 'move_swapped', {
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.swapUsed, {
         nextMoveId: next.id,
         system: current.currentSystem,
       }),
@@ -742,12 +1138,10 @@ export function useDecidoApp() {
   }
 
   function startStreakSaverReset() {
-    setForcedMove(streakSaverMove);
-    setGuidanceVisible(true);
-    setTab('today');
+    startRecoveryMove('missed-day');
     setAppData((current) => ({
       ...current,
-      analytics: trackAnalyticsEvent(current.analytics, 'streak_saver_started', {
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.streakSaverStarted, {
         credits: current.streakFreeze.credits,
       }),
     }));
@@ -756,10 +1150,11 @@ export function useDecidoApp() {
   function selectSystem(systemId: SystemId) {
     const track = trackCards.find((card) => card.id === systemId);
     if (!track) return;
+
     setAppData((current) => ({
       ...current,
       currentSystem: systemId,
-      analytics: trackAnalyticsEvent(current.analytics, 'system_selected', {
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.systemSelected, {
         system: systemId,
       }),
     }));
@@ -771,13 +1166,30 @@ export function useDecidoApp() {
   }
 
   function openShare(record: DecisionRecord | null = null) {
+    const nextVariant: 'completion' | 'recovery' | 'streak' | 'preview' =
+      record?.isRecoveryMove || record?.focusRunOutcome === 'partial'
+        ? 'recovery'
+        : streak >= 7
+          ? 'streak'
+          : record?.completion === 'done'
+            ? 'completion'
+            : 'preview';
+
     if (record) {
       setShareRecord(record);
+      setShareVariant(nextVariant);
       setAppData((current) => ({
         ...current,
-        analytics: trackAnalyticsEvent(current.analytics, 'share_open', {
-          recordId: record.id,
-        }),
+        analytics: trackAnalyticsEvent(
+          trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.shareOpened, {
+            recordId: record.id,
+          }),
+          ANALYTICS_EVENTS.shareVariantOpened,
+          {
+            variant: nextVariant,
+            recordId: record.id,
+          }
+        ),
       }));
       return;
     }
@@ -797,12 +1209,23 @@ export function useDecidoApp() {
       reflection: '',
       reviewedAt: null,
       executionSeconds: null,
+      isRecoveryMove: move.id === 'reset-micro-meditation',
+      swapCountBeforeSelection: consecutiveSwaps,
+      focusRunOutcome: null,
     });
+    setShareVariant(nextVariant);
     setAppData((current) => ({
       ...current,
-      analytics: trackAnalyticsEvent(current.analytics, 'share_open', {
-        moveId: move.id,
-      }),
+      analytics: trackAnalyticsEvent(
+        trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.shareOpened, {
+          moveId: move.id,
+        }),
+        ANALYTICS_EVENTS.shareVariantOpened,
+        {
+          variant: nextVariant,
+          moveId: move.id,
+        }
+      ),
     }));
   }
 
@@ -810,10 +1233,12 @@ export function useDecidoApp() {
     if (!shareRecord) return;
     const shareMessage =
       shareGiftPreview?.shareMessage ??
-      `I completed my move today: ${shareRecord.selectedSuggestion.title}. ${shareRecord.selectedSuggestion.action}`;
+      `${shareRecord.selectedSuggestion.title}. ${shareRecord.selectedSuggestion.action}`;
+
     await Share.share({
       message: shareMessage,
     });
+
     setAppData((current) => ({
       ...current,
       gifting: shareGiftPreview
@@ -823,18 +1248,37 @@ export function useDecidoApp() {
           }
         : current.gifting,
       analytics: trackAnalyticsEvent(
-        current.analytics,
-        shareGiftPreview ? 'gift_move' : 'share_sent',
-        shareGiftPreview ? { code: shareGiftPreview.code } : { recordId: shareRecord.id }
+        trackAnalyticsEvent(
+          current.analytics,
+          shareGiftPreview ? ANALYTICS_EVENTS.giftMoveSent : ANALYTICS_EVENTS.shareSent,
+          shareGiftPreview ? { code: shareGiftPreview.code } : { recordId: shareRecord.id }
+        ),
+        ANALYTICS_EVENTS.shareVariantUsed,
+        {
+          variant: shareVariant,
+          mode: shareGiftPreview ? 'gift' : 'standard',
+        }
       ),
     }));
     setShareRecord(null);
+    setShareVariant('preview');
+  }
+
+  function trackCtaTap(screen: string, cta: string, contextMeta?: Record<string, string | number | boolean | null>) {
+    setAppData((current) => ({
+      ...current,
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.ctaTapped, {
+        screen,
+        cta,
+        ...contextMeta,
+      }),
+    }));
   }
 
   async function mockPurchase(plan: Exclude<PlanTier, 'free'>) {
     setAppData((current) => ({
       ...current,
-      analytics: trackAnalyticsEvent(current.analytics, 'purchase_attempt', {
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.purchaseStarted, {
         plan,
         liveStore: billing.hasLiveStore,
       }),
@@ -846,8 +1290,12 @@ export function useDecidoApp() {
         return;
       } catch (error) {
         Alert.alert(
-          'Store unavailable',
-          error instanceof Error ? error.message : 'Purchase could not start.'
+          appData.language === 'tr' ? 'Magaza kullanilamiyor' : 'Store unavailable',
+          error instanceof Error
+            ? error.message
+            : appData.language === 'tr'
+              ? 'Satin alim baslatilamadi.'
+              : 'Purchase could not start.'
         );
         return;
       }
@@ -855,8 +1303,10 @@ export function useDecidoApp() {
 
     if (Platform.OS !== 'web') {
       Alert.alert(
-        'Store connecting',
-        'The native store catalog is not ready yet. Please wait a moment and try again.'
+        appData.language === 'tr' ? 'Magaza baglaniyor' : 'Store connecting',
+        appData.language === 'tr'
+          ? 'Native store katalogu henuz hazir degil. Biraz bekleyip tekrar dene.'
+          : 'The native store catalog is not ready yet. Please wait a moment and try again.'
       );
       return;
     }
@@ -876,7 +1326,7 @@ export function useDecidoApp() {
         source: 'manual',
         lastSyncedAt: new Date().toISOString(),
       },
-      analytics: trackAnalyticsEvent(current.analytics, 'purchase_success', {
+      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.purchaseCompleted, {
         plan,
         source: 'manual',
       }),
@@ -885,8 +1335,8 @@ export function useDecidoApp() {
         credits: plan === 'founding' ? 3 : Math.max(current.streakFreeze.credits, 1),
       },
     }));
-    setPaywallVisible(false);
-    setPendingPaywall(false);
+    closePaywall();
+    setPendingSoftPaywall(false);
   }
 
   async function restoreMockPurchase() {
@@ -896,8 +1346,12 @@ export function useDecidoApp() {
         return;
       } catch (error) {
         Alert.alert(
-          'Restore failed',
-          error instanceof Error ? error.message : 'Could not restore purchases.'
+          appData.language === 'tr' ? 'Geri yukleme basarisiz' : 'Restore failed',
+          error instanceof Error
+            ? error.message
+            : appData.language === 'tr'
+              ? 'Satin alimlar geri yuklenemedi.'
+              : 'Could not restore purchases.'
         );
         return;
       }
@@ -905,8 +1359,10 @@ export function useDecidoApp() {
 
     if (Platform.OS !== 'web') {
       Alert.alert(
-        'Restore unavailable',
-        'The native store is not ready yet. Please try restore again in a moment.'
+        appData.language === 'tr' ? 'Geri yukleme hazir degil' : 'Restore unavailable',
+        appData.language === 'tr'
+          ? 'Native store henuz hazir degil. Biraz sonra tekrar dene.'
+          : 'The native store is not ready yet. Please try restore again in a moment.'
       );
       return;
     }
@@ -922,8 +1378,12 @@ export function useDecidoApp() {
         return;
       } catch (error) {
         Alert.alert(
-          'Subscription settings',
-          error instanceof Error ? error.message : 'Could not open subscription settings.'
+          appData.language === 'tr' ? 'Abonelik ayarlari' : 'Subscription settings',
+          error instanceof Error
+            ? error.message
+            : appData.language === 'tr'
+              ? 'Abonelik ayarlari acilamadi.'
+              : 'Could not open subscription settings.'
         );
         return;
       }
@@ -931,17 +1391,22 @@ export function useDecidoApp() {
 
     if (Platform.OS !== 'web') {
       Alert.alert(
-        'Subscription settings',
-        'Subscription settings will open once the native store connection is ready.'
+        appData.language === 'tr' ? 'Abonelik ayarlari' : 'Subscription settings',
+        appData.language === 'tr'
+          ? 'Native store baglantisi hazir oldugunda abonelik ayarlari acilir.'
+          : 'Subscription settings will open once the native store connection is ready.'
       );
       return;
     }
 
     if (appData.subscription.plan === 'free') {
-      setPaywallVisible(true);
+      showPaywall('soft-success', 'settings-upgrade');
       return;
     }
-    Alert.alert('Mock subscription', 'Mock Pro is active on this device.');
+    Alert.alert(
+      appData.language === 'tr' ? 'Abonelik' : 'Subscription',
+      appData.language === 'tr' ? 'Bu cihazda Pro aktif.' : 'Pro is active on this device.'
+    );
   }
 
   function toggleLanguage() {
@@ -953,11 +1418,27 @@ export function useDecidoApp() {
 
   function closeReward() {
     setReward(null);
-    if (pendingPaywall) {
-      setPendingPaywall(false);
-      setPaywallVisible(true);
+    if (pendingSoftPaywall) {
+      setPendingSoftPaywall(false);
+      showPaywall('soft-success', 'post-success');
     }
   }
+
+  const phaseLabel = copy.helpers.phaseLabel({
+    isPremium: entitlements.isPremium,
+    isActivationPhase: entitlements.isActivationPhase,
+    activationDay: accessState.activationDay,
+  });
+  const movesLeftLabel = entitlements.isPremium
+    ? copy.helpers.unlimitedMoves
+    : copy.helpers.movesLeftLabel(accessState.movesRemaining);
+  const swapsLeftLabel = entitlements.isPremium
+    ? copy.helpers.unlimitedSwaps
+    : copy.helpers.swapsLeftLabel(accessState.swapsRemaining);
+  const premiumTease = copy.helpers.premiumTease({
+    plan: appData.subscription.plan,
+    isActivationPhase: entitlements.isActivationPhase,
+  });
 
   return {
     loaded,
@@ -970,28 +1451,45 @@ export function useDecidoApp() {
     suggestions,
     selectedMove: activeMove,
     guidance,
+    fullGuidance,
+    guidanceVisible,
+    setGuidanceVisible,
     projection,
     rewardProfile,
     streak,
     todayGain,
     tomorrowGain,
     tonightLine,
-    guidanceVisible,
-    setGuidanceVisible,
     focusRunView,
     reward,
-    paywallVisible,
-    setPaywallVisible,
+    paywallVisible: paywallState.visible,
+    paywallMode: paywallState.mode,
+    paywallSource: paywallState.source,
+    paywallBody: paywallState.mode === 'soft-success' ? softPaywallBody : hardPaywallBody,
+    setPaywallVisible: (visible: boolean) => {
+      if (!visible) {
+        closePaywall();
+        return;
+      }
+      showPaywall('soft-success', 'manual');
+    },
     shareRecord,
+    shareVariant,
     setShareRecord,
     trackCards,
     dnaCards,
+    dnaLockedCount: dnaCards.filter((card) => card.metric === copy.states.locked).length,
     weeklySummary,
     pending,
     recent,
     analyticsSummary,
-    movesRemaining,
-    isPro,
+    progressSummary,
+    behaviorProfile,
+    movesRemaining: accessState.movesRemaining,
+    swapsRemaining: accessState.swapsRemaining,
+    isPro: entitlements.isPremium,
+    accessState,
+    entitlements,
     streakSaverEligible,
     streakFreezeCredits: appData.streakFreeze.credits,
     consecutiveSwaps,
@@ -1015,9 +1513,11 @@ export function useDecidoApp() {
     scoreFocusRun,
     swapMove,
     startStreakSaverReset,
+    startRecoveryMove,
     selectSystem,
     performShare,
     openShare,
+    trackCtaTap,
     mockPurchase,
     restoreMockPurchase,
     manageSubscription,
@@ -1035,10 +1535,21 @@ export function useDecidoApp() {
     storeConnected: billing.hasLiveStore,
     storeCatalogLoaded: billing.catalogLoaded,
     storeError: billing.storeError,
+    phaseLabel,
+    movesLeftLabel,
+    swapsLeftLabel,
+    premiumTease,
+    recoveryPrompt,
+    openPaywall: showPaywall,
   };
 }
 
-function buildSimpleDnaCards(decisions: DecisionRecord[], dnaScores: AppData['dnaScores']) {
+function buildSimpleDnaCards(
+  decisions: DecisionRecord[],
+  dnaScores: AppData['dnaScores'],
+  language: AppData['language'],
+  premiumInsights: boolean
+) {
   const reviewed = decisions.filter((decision) => decision.reviewedAt);
   if (!reviewed.length) return [];
 
@@ -1049,72 +1560,121 @@ function buildSimpleDnaCards(decisions: DecisionRecord[], dnaScores: AppData['dn
   const shortDone = reviewed.filter(
     (decision) => decision.selectedSuggestion.minutes <= 10 && decision.completion === 'done'
   ).length;
-  const hardAvoid = reviewed.filter((decision) => decision.context.friction === 'avoidant').length;
+  const avoidantMoments = reviewed.filter(
+    (decision) => decision.context.friction === 'avoidant'
+  ).length;
+  const lockedMetric = language === 'tr' ? 'Kilitli' : 'Locked';
 
   return [
     {
       id: 'time',
-      eyebrow: 'Best time',
-      title: 'Mornings look stronger',
-      body: `You have ${morningDone} clean morning closes so far.`,
-      metric: `${morningDone} wins`,
+      eyebrow: language === 'tr' ? 'En iyi pencere' : 'Best window',
+      title: language === 'tr' ? 'Sabah kapanislari daha temiz' : 'Morning closes are cleaner',
+      body:
+        language === 'tr'
+          ? `Simdiye kadar ${morningDone} temiz sabah kapanisi birikti.`
+          : `You already stacked ${morningDone} clean morning closes.`,
+      metric: `${morningDone}`,
     },
     {
       id: 'format',
-      eyebrow: 'Best format',
-      title: 'Short moves are working',
-      body: `Sub-10-minute moves are giving you the cleanest follow-through.`,
-      metric: `${shortDone} short wins`,
+      eyebrow: language === 'tr' ? 'En iyi format' : 'Best format',
+      title:
+        language === 'tr'
+          ? 'Kisa hamleler sende daha sert kapaniyor'
+          : 'Short moves are closing harder for you',
+      body:
+        language === 'tr'
+          ? '10 dakikanin altindaki hamleler daha fazla temiz kapanis uretiyor.'
+          : 'Sub-10-minute moves are creating cleaner follow-through.',
+      metric: `${shortDone}`,
     },
     {
       id: 'friction',
-      eyebrow: 'Main friction',
-      title: 'You avoid high-friction tasks',
-      body: `Avoidance showed up ${hardAvoid} times. Easier re-entry moves matter.`,
-      metric: `${hardAvoid} avoidant moments`,
+      eyebrow: language === 'tr' ? 'Surtunme' : 'Main friction',
+      title:
+        language === 'tr'
+          ? 'Yuksek direnci olan seyleri gec aciyorsun'
+          : 'You are still opening high-resistance tasks late',
+      body:
+        language === 'tr'
+          ? `Kacinma ${avoidantMoments} kez goruldu. Daha hafif geri girisler kritik.`
+          : `Avoidance showed up ${avoidantMoments} times. Easier re-entry moves matter.`,
+      metric: `${avoidantMoments}`,
     },
     {
       id: 'efficiency',
-      eyebrow: 'Efficiency',
-      title: 'You are getting faster',
-      body: 'Finishing under the estimated time increases your efficiency score.',
-      metric: `${dnaScores.efficiency}/100`,
+      eyebrow: 'DNA',
+      title:
+        language === 'tr'
+          ? 'Verimlilik puani daha derin veride acilir'
+          : 'Efficiency unlocks with deeper pattern data',
+      body:
+        language === 'tr'
+          ? 'Tahminden hizli bitirdigin bloklar verimliligi yukseltiyor.'
+          : 'Finishing faster than the estimate raises your efficiency score.',
+      metric: premiumInsights ? `${dnaScores.efficiency}/100` : lockedMetric,
     },
     {
       id: 'intuition',
-      eyebrow: 'Intuition',
-      title: 'You can move without extra explanation',
-      body: 'Starting without opening guidance increases your intuition score.',
-      metric: `${dnaScores.intuition}/100`,
+      eyebrow: 'DNA',
+      title:
+        language === 'tr'
+          ? 'Sezgi puani fazla aciklama istemediginde buyuyor'
+          : 'Intuition grows when you stop asking for more explanation',
+      body:
+        language === 'tr'
+          ? 'Neden ekranina girmeden baslamak sezgi guvenini guclendirir.'
+          : 'Starting without opening guidance builds intuitive trust.',
+      metric: premiumInsights ? `${dnaScores.intuition}/100` : lockedMetric,
     },
   ];
 }
 
-function buildSimpleWeeklySummary(decisions: DecisionRecord[]) {
+function buildSimpleWeeklySummary(decisions: DecisionRecord[], language: AppData['language']) {
   const recent = decisions.filter((decision) => decision.reviewedAt).slice(0, 7);
   if (!recent.length) {
     return {
-      title: 'Your momentum is just starting',
-      body: 'Complete and score a couple of moves and this section will turn into a real weekly win board.',
+      title:
+        language === 'tr'
+          ? 'Ritim yeni kuruluyor'
+          : 'Your rhythm is just forming',
+      body:
+        language === 'tr'
+          ? 'Birkac skorlanan hamleden sonra hangi formatin sende daha temiz kapandigi netlesir.'
+          : 'After a few scored moves, the system can tell which format really closes better for you.',
     };
   }
 
   const doneCount = recent.filter((decision) => decision.completion === 'done').length;
   const avgScore =
     Math.round(
-      (recent.reduce((sum, decision) => sum + (decision.resultScore ?? 0), 0) / recent.length) * 10
+      (recent.reduce((sum, decision) => sum + (decision.resultScore ?? 0), 0) / recent.length) *
+        10
     ) / 10;
 
   return {
-    title: `${doneCount}/${recent.length} moves closed this week`,
-    body: `Your average result score is ${avgScore}/5. The app should now be showing cleaner daily move quality.`,
+    title:
+      language === 'tr'
+        ? `Bu hafta ${doneCount}/${recent.length} hamle temiz kapandi`
+        : `${doneCount}/${recent.length} moves closed this week`,
+    body:
+      language === 'tr'
+        ? `Ortalama skorun ${avgScore}/5. Sistem artik sana hangi zorlugun sende calistigini daha net okuyor.`
+        : `Your average score is ${avgScore}/5. The system is reading which level of pressure actually works for you.`,
   };
 }
 
-function getDateKeyOffset(offset: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return date.toISOString().slice(0, 10);
+function buildTonightLine(language: AppData['language'], pendingCount: number, completionRate: number) {
+  if (pendingCount > 0) {
+    return language === 'tr'
+      ? `${pendingCount} hamle bu aksam skor bekliyor. Asil keskinlesme burada oluyor.`
+      : `${pendingCount} moves are waiting for a score tonight. This is where the system sharpens.`;
+  }
+
+  return language === 'tr'
+    ? `Bugunluk kapanis oranin %${completionRate}. Gece bir skor daha yarinin hamlesini temizler.`
+    : `Your close rate is ${completionRate}% today. One score tonight makes tomorrow cleaner.`;
 }
 
 function buildSharePersonaLabel(systemId: SystemId, streak: number, language: AppData['language']) {
@@ -1124,11 +1684,13 @@ function buildSharePersonaLabel(systemId: SystemId, streak: number, language: Ap
 
   const labels = {
     decide: language === 'tr' ? 'Taktik Mimar' : 'The Tactical Architect',
-    learn: language === 'tr' ? 'Sinyal Ustasi' : 'The Signal Builder',
-    earn: language === 'tr' ? 'Gelir Stratejisti' : 'The Revenue Strategist',
-    move: language === 'tr' ? 'Akis Ustasi' : 'The Flow Master',
+    learn: language === 'tr' ? 'Bilgi Mimari' : 'The Pattern Builder',
+    earn: language === 'tr' ? 'Gelir Operatori' : 'The Revenue Operator',
+    move: language === 'tr' ? 'Akis Motoru' : 'The Flow Engine',
     reset: language === 'tr' ? 'Sakin Operator' : 'The Calm Operator',
   } satisfies Record<SystemId, string>;
 
   return labels[systemId];
 }
+
+

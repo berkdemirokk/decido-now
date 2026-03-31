@@ -20,10 +20,10 @@ export function DNAInsightCard({
   onPress,
 }: DNAInsightCardProps) {
   return (
-    <Pressable disabled={!onPress} onPress={onPress} style={styles.card}>
+    <Pressable disabled={!onPress} onPress={onPress} style={[styles.card, locked ? styles.cardLocked : null]}>
       <Text style={styles.eyebrow}>{eyebrow}</Text>
-      <Text style={styles.title}>{locked ? 'Locked insight' : title}</Text>
-      <Text style={styles.body}>{locked ? 'Upgrade to reveal this pattern.' : body}</Text>
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.body}>{body}</Text>
       <View style={styles.metricPill}>
         <Text style={styles.metric}>{locked ? 'Pro' : metric}</Text>
       </View>
@@ -39,6 +39,10 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     padding: theme.spacing.lg,
     gap: theme.spacing.sm,
+  },
+  cardLocked: {
+    backgroundColor: theme.colors.surfaceAlt,
+    borderColor: theme.colors.borderStrong,
   },
   eyebrow: {
     color: theme.colors.textSoft,

@@ -93,6 +93,73 @@ export function buildDecisionFatigueReset(language: SupportedLanguage): Suggesti
   };
 }
 
+export function buildRecoveryMove(
+  language: SupportedLanguage,
+  source: 'abandon' | 'missed-day' | 'swap-fatigue'
+): Suggestion {
+  if (source === 'missed-day') {
+    return language === 'tr'
+      ? {
+          id: 'reset-late-save',
+          title: 'Gunu kurtaran 2 dakikalik reset',
+          action: 'Bir dakika nefesi duzle, bir dakika bugunu kapatacak tek seyi sec ve hemen uygula.',
+          reason: 'Bugun tamamen dusmeden once ritmi korumak icin en kisa geri giris bu.',
+          category: 'reset',
+          preferredModes: ['reset', 'quick-win'],
+          energies: ['low', 'mid', 'high'],
+          minutes: 2,
+          budget: ['free'],
+          goals: ['reset', 'finish'],
+          frictions: ['tired', 'avoidant', 'anxious'],
+        }
+      : {
+          id: 'reset-late-save',
+          title: '2-minute late save',
+          action: 'Spend one minute flattening your breath, then one minute closing the one thing that still saves the day.',
+          reason: 'This is the shortest way back before today fully slips.',
+          category: 'reset',
+          preferredModes: ['reset', 'quick-win'],
+          energies: ['low', 'mid', 'high'],
+          minutes: 2,
+          budget: ['free'],
+          goals: ['reset', 'finish'],
+          frictions: ['tired', 'avoidant', 'anxious'],
+        };
+  }
+
+  if (source === 'abandon') {
+    return language === 'tr'
+      ? {
+          id: 'reset-salvage-run',
+          title: 'Kosuyu kurtaran mini reset',
+          action: 'Yarida kalan kosudan sadece tek parca sec. Onu 2 dakika icinde temiz kapat.',
+          reason: 'Yarida kalmis hissi buyumeden ritmi geri almak icin bu daha dogru.',
+          category: 'reset',
+          preferredModes: ['reset', 'stuck'],
+          energies: ['low', 'mid', 'high'],
+          minutes: 2,
+          budget: ['free'],
+          goals: ['finish', 'reset'],
+          frictions: ['avoidant', 'distracted', 'anxious'],
+        }
+      : {
+          id: 'reset-salvage-run',
+          title: 'Mini salvage reset',
+          action: 'Pull one piece out of the unfinished run and close only that piece inside 2 minutes.',
+          reason: 'This gets rhythm back before the unfinished feeling spreads.',
+          category: 'reset',
+          preferredModes: ['reset', 'stuck'],
+          energies: ['low', 'mid', 'high'],
+          minutes: 2,
+          budget: ['free'],
+          goals: ['finish', 'reset'],
+          frictions: ['avoidant', 'distracted', 'anxious'],
+        };
+  }
+
+  return buildDecisionFatigueReset(language);
+}
+
 function getMorningWeight(suggestion: Suggestion) {
   if (suggestion.category === 'earn' || suggestion.category === 'money') return 5;
   if (suggestion.category === 'health') return 4;

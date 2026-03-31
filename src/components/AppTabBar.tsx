@@ -33,7 +33,7 @@ export function AppTabBar({ current, items, onChange }: AppTabBarProps) {
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: 'rgba(12,17,24,0.74)',
+    backgroundColor: 'rgba(6,6,6,0.82)',
     borderTopWidth: 1,
     borderColor: theme.colors.border,
     paddingHorizontal: theme.spacing.md,
@@ -53,6 +53,8 @@ const styles = StyleSheet.create({
   },
   itemActive: {
     backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
   },
   label: {
     color: theme.colors.textSoft,
@@ -61,6 +63,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   labelActive: {
-    color: theme.colors.text,
+    color: theme.colors.accent,
   },
 });
