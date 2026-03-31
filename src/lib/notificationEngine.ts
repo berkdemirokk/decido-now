@@ -1,15 +1,4 @@
-import * as Notifications from 'expo-notifications';
-
 import { SupportedLanguage } from '../types';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
 
 export interface RecallNotificationPayload {
   title: string;
@@ -24,13 +13,7 @@ export interface StreakSaverNotificationPayload {
 }
 
 export async function ensureNotificationPermission() {
-  const current = await Notifications.getPermissionsAsync();
-  if (current.granted) {
-    return 'granted' as const;
-  }
-
-  const requested = await Notifications.requestPermissionsAsync();
-  return requested.granted ? ('granted' as const) : ('denied' as const);
+  return 'denied' as const;
 }
 
 export function buildRecallNotification(moveTitle: string, language: SupportedLanguage): RecallNotificationPayload {
@@ -70,21 +53,8 @@ export function buildStreakSaverNotification(language: SupportedLanguage): Strea
 }
 
 export async function scheduleLocalNotification(payload: RecallNotificationPayload | StreakSaverNotificationPayload) {
-  try {
-    return await Notifications.scheduleNotificationAsync({
-      content: {
-        title: payload.title,
-        body: payload.body,
-        sound: false,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: payload.date,
-      },
-    });
-  } catch {
-    return null;
-  }
+  void payload;
+  return null;
 }
 
 function getTonightSaverTime() {
