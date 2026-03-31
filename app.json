@@ -49,8 +49,7 @@
     },
     "owner": "berkdemirok",
     "plugins": [
-      "expo-iap",
-      "expo-notifications"
+      "expo-iap"
     ]
   }
 }

@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "babel-preset-expo": "^55.0.13",
+    "babel-preset-expo": "~54.0.10",
     "playwright": "^1.58.2",
     "typescript": "~5.9.2"
   },
