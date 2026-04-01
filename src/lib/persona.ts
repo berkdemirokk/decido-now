@@ -40,57 +40,57 @@ export function buildPersonaProfile(
     case 'the-perfectionist':
       return {
         id,
-        title: isTr ? 'Mukemmeliyetci' : 'The Perfectionist',
+        title: isTr ? 'Mükemmeliyetçi' : 'The Perfectionist',
         auditLine: isTr
-          ? `${describeGoal(goal, true)} tarafinda kaliteyi buyutmek bazen hareketi geciktiriyor.`
-          : `In ${describeGoal(goal, false)} moves, quality pressure is slowing your first step.`,
+          ? `${describeGoal(goal, true)} tarafında kalite baskısı ilk hareketi geciktiriyor.`
+          : `In ${describeGoal(goal, false)} moves, quality pressure is delaying your first move.`,
         guidanceTone: {
           whyPrefix: isTr
-            ? 'Bunu dogru yapmak zorunda degilsin; gonderilebilir ilk versiyon yeterli.'
-            : 'You do not need the perfect version; the first sendable version is enough.',
+            ? 'Kusursuz versiyona ihtiyacın yok. Gönderilebilir ilk versiyon yeterli.'
+            : 'You do not need the perfect version. The first sendable version is enough.',
           actionPrefix: isTr
-            ? 'Hamleyi hafiflet ve sadece ilk temiz cikisi hedefle.'
-            : 'Keep the move light and aim for the first clean output.',
+            ? 'Hamleyi hafiflet. İlk temiz çıkışı hedefle.'
+            : 'Lighten the move. Aim for the first clean output.',
           tomorrowPrefix: isTr
-            ? 'Yarin kaliteyi degil surekliligi buyut.'
+            ? 'Yarın kaliteyi değil, sürekliliği büyüt.'
             : 'Tomorrow, grow consistency before quality.',
         },
       };
     case 'the-chaotic-achiever':
       return {
         id,
-        title: isTr ? 'Kaotik Basarici' : 'The Chaotic Achiever',
+        title: isTr ? 'Kaotik Başarıcı' : 'The Chaotic Achiever',
         auditLine: isTr
-          ? `${describeGoal(goal, true)} niyetin guclu ama dağinik enerji temiz kapanislari bozuyor.`
+          ? `${describeGoal(goal, true)} niyetin güçlü ama dağınık enerji temiz kapanışları bozuyor.`
           : `Your drive is strong, but scattered energy is hurting clean closes in ${describeGoal(goal, false)} moves.`,
         guidanceTone: {
           whyPrefix: isTr
-            ? 'Hizin iyi; sistemi tek hedefe indirdiginde sonuca daha hizli ulasiyorsun.'
-            : 'Your speed is useful; when the system narrows to one target, you close faster.',
+            ? 'Hızın değerli. Tek hedefe indiğinde sonuç çok daha hızlı geliyor.'
+            : 'Your speed is useful. When you narrow to one target, results arrive faster.',
           actionPrefix: isTr
-            ? 'Sadece tek hedef acik kalsin; kalan her seyi sustur.'
-            : 'Leave only one target open and mute the rest.',
+            ? 'Tek hedef kalsın. Geri kalan her şeyi sustur.'
+            : 'Leave one target open. Mute the rest.',
           tomorrowPrefix: isTr
-            ? 'Yarin ivmeni dagitmadan koru.'
+            ? 'Yarın ivmeni dağıtmadan koru.'
             : 'Tomorrow, protect your momentum without scattering it.',
         },
       };
     default:
       return {
         id,
-        title: isTr ? 'Tereddutlu Profesyonel' : 'The Hesitant Pro',
+        title: isTr ? 'Tereddütlü Profesyonel' : 'The Hesitant Pro',
         auditLine: isTr
-          ? `${describeGoal(goal, true)} tarafinda ne yapman gerektigini biliyorsun; esik sadece ilk cikis.`
-          : `You already know what good looks like in ${describeGoal(goal, false)} moves; the main threshold is just the first send.`,
+          ? `${describeGoal(goal, true)} tarafında ne yapman gerektiğini biliyorsun. Asıl eşik ilk çıkış.`
+          : `You already know what good looks like in ${describeGoal(goal, false)} moves. The real threshold is the first send.`,
         guidanceTone: {
           whyPrefix: isTr
-            ? 'Bu hamle karar kalitesini degil, ilk hareket cesaretini hedefliyor.'
-            : 'This move is not testing your quality, it is opening your first motion.',
+            ? 'Bu hamle kalite testi değil; ilk hareketi açma hamlesi.'
+            : 'This move is not a quality test. It is a first-motion move.',
           actionPrefix: isTr
-            ? 'Kisa, net ve yapilabilir kal.'
-            : 'Keep it short, clear, and finishable.',
+            ? 'Kısa kal. Net kal. Kapanabilir kal.'
+            : 'Keep it short. Keep it clear. Keep it closeable.',
           tomorrowPrefix: isTr
-            ? 'Yarin bu esik daha hafif hissedebilir.'
+            ? 'Yarın bu eşik daha hafif hissedilecek.'
             : 'Tomorrow, this threshold should feel lighter.',
         },
       };
@@ -98,16 +98,16 @@ export function buildPersonaProfile(
 }
 
 function describeGoal(goal: Goal | undefined, tr: boolean) {
-  const fallback = tr ? 'bugunun' : "today's";
+  const fallback = tr ? 'bugünün' : "today's";
   if (!goal) return fallback;
 
   const map: Record<Goal, { tr: string; en: string }> = {
-    finish: { tr: 'bitirme', en: 'finishing' },
-    learn: { tr: 'ogrenme', en: 'learning' },
+    finish: { tr: 'kapatma', en: 'closing' },
+    learn: { tr: 'öğrenme', en: 'learning' },
     earn: { tr: 'gelir', en: 'earning' },
     reset: { tr: 'toparlanma', en: 'reset' },
-    connect: { tr: 'bag kurma', en: 'connection' },
-    build: { tr: 'uretim', en: 'building' },
+    connect: { tr: 'bağ kurma', en: 'connection' },
+    build: { tr: 'üretim', en: 'building' },
   };
 
   return tr ? map[goal].tr : map[goal].en;

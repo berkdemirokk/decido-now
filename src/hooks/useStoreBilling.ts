@@ -6,7 +6,7 @@ import {
   useIAP,
 } from 'expo-iap';
 import { Platform } from 'react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ALL_STORE_PRODUCT_IDS,
@@ -33,6 +33,7 @@ type StorePriceLabels = {
 export function useStoreBilling() {
   const [storeError, setStoreError] = useState<string | null>(null);
   const [purchasePending, setPurchasePending] = useState(false);
+  const [restorePending, setRestorePending] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const finishTransactionRef = useRef<null | ((args: { purchase: any; isConsumable?: boolean }) => Promise<void>)>(null);
 
@@ -40,14 +41,21 @@ export function useStoreBilling() {
     onPurchaseError: (error) => {
       setStoreError(error.message ?? 'Purchase failed');
       setPurchasePending(false);
+      setRestorePending(false);
     },
     onError: (error) => {
       setStoreError(error.message);
       setPurchasePending(false);
+      setRestorePending(false);
     },
     onPurchaseSuccess: async (purchase) => {
       try {
         await finishTransactionRef.current?.({ purchase, isConsumable: false });
+        setStoreError(null);
+        await Promise.all([
+          iap.getActiveSubscriptions([...SUBSCRIPTION_IDS]),
+          iap.getAvailablePurchases(),
+        ]);
       } finally {
         setPurchasePending(false);
       }
@@ -56,22 +64,40 @@ export function useStoreBilling() {
 
   finishTransactionRef.current = iap.finishTransaction;
 
+  const refreshStoreState = useCallback(async () => {
+    await Promise.all([
+      iap.getActiveSubscriptions([...SUBSCRIPTION_IDS]),
+      iap.getAvailablePurchases(),
+    ]);
+  }, [iap]);
+
+  const loadCatalog = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      throw new Error('Store is available in native builds only.');
+    }
+
+    if (!iap.connected) {
+      throw new Error('Store connection is not ready yet.');
+    }
+
+    await iap.fetchProducts({ skus: [...ALL_STORE_PRODUCT_IDS], type: 'all' });
+    await refreshStoreState();
+  }, [iap, refreshStoreState]);
+
   useEffect(() => {
     if (Platform.OS === 'web' || !iap.connected) return;
 
     let cancelled = false;
     void (async () => {
       try {
-        await iap.fetchProducts({ skus: [...ALL_STORE_PRODUCT_IDS], type: 'all' });
-        await Promise.all([
-          iap.getActiveSubscriptions([...SUBSCRIPTION_IDS]),
-          iap.getAvailablePurchases(),
-        ]);
+        await loadCatalog();
         if (!cancelled) {
           setCatalogLoaded(true);
+          setStoreError(null);
         }
       } catch (error) {
         if (!cancelled) {
+          setCatalogLoaded(false);
           setStoreError(error instanceof Error ? error.message : 'Store unavailable');
         }
       }
@@ -80,7 +106,7 @@ export function useStoreBilling() {
     return () => {
       cancelled = true;
     };
-  }, [iap.connected]);
+  }, [iap.connected, loadCatalog]);
 
   const catalog = useMemo<StoreCatalog>(() => {
     const map: StoreCatalog = {};
@@ -137,41 +163,89 @@ export function useStoreBilling() {
 
     setPurchasePending(true);
     setStoreError(null);
+    try {
+      if (!iap.connected) {
+        throw new Error('Store connection is not ready yet.');
+      }
 
-    if (plan === 'founding') {
+      if (!catalogLoaded) {
+        await loadCatalog();
+        setCatalogLoaded(true);
+        setStoreError(null);
+
+        if (iap.products.length === 0 && iap.subscriptions.length === 0) {
+          throw new Error('Store refreshed. Try again.');
+        }
+      }
+
+      if (plan === 'founding') {
+        if (!catalog.founding) {
+          await loadCatalog();
+          setCatalogLoaded(true);
+          setStoreError(null);
+          throw new Error('Store refreshed. Try again.');
+        }
+
+        await iap.requestPurchase({
+          type: 'in-app',
+          request: {
+            apple: { sku: ONE_TIME_PRODUCT_IDS.founding },
+            google: { skus: [ONE_TIME_PRODUCT_IDS.founding] },
+          },
+        });
+        return;
+      }
+
+      const sku = getProductIdFromPlan(plan);
+      const product = plan === 'pro-yearly' ? catalog.yearly : catalog.monthly;
+
+      if (!product) {
+        await loadCatalog();
+        setCatalogLoaded(true);
+        setStoreError(null);
+        throw new Error('Store refreshed. Try again.');
+      }
+
+      const offerToken = getPrimarySubscriptionOfferToken(product);
+
       await iap.requestPurchase({
-        type: 'in-app',
+        type: 'subs',
         request: {
-          apple: { sku: ONE_TIME_PRODUCT_IDS.founding },
-          google: { skus: [ONE_TIME_PRODUCT_IDS.founding] },
+          apple: { sku },
+          google: {
+            skus: [sku],
+            subscriptionOffers: offerToken ? [{ sku, offerToken }] : undefined,
+          },
         },
       });
-      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Purchase failed';
+      setStoreError(message);
+      setPurchasePending(false);
+      throw error;
     }
-
-    const sku = getProductIdFromPlan(plan);
-    const product = plan === 'pro-yearly' ? catalog.yearly : catalog.monthly;
-    const offerToken = getPrimarySubscriptionOfferToken(product);
-
-    await iap.requestPurchase({
-      type: 'subs',
-      request: {
-        apple: { sku },
-        google: {
-          skus: [sku],
-          subscriptionOffers: offerToken ? [{ sku, offerToken }] : undefined,
-        },
-      },
-    });
   }
 
   async function restore() {
     if (Platform.OS === 'web') {
-      return;
+      throw new Error('Restore is available in native builds only.');
     }
+    setRestorePending(true);
     setStoreError(null);
-    await iap.restorePurchases();
-    await Promise.all([iap.getAvailablePurchases(), iap.getActiveSubscriptions([...SUBSCRIPTION_IDS])]);
+    try {
+      if (!iap.connected) {
+        throw new Error('Store connection is not ready yet.');
+      }
+
+      await iap.restorePurchases();
+      await refreshStoreState();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Restore failed';
+      setStoreError(message);
+      throw error;
+    } finally {
+      setRestorePending(false);
+    }
   }
 
   async function manage(currentProductId?: string | null) {
@@ -191,6 +265,7 @@ export function useStoreBilling() {
     connected: iap.connected,
     catalogLoaded,
     purchasePending,
+    restorePending,
     storeError,
     catalog,
     priceLabels,

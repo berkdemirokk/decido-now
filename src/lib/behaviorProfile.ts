@@ -23,13 +23,9 @@ export function buildBehaviorProfile(
   const last = reviewed[0] ?? null;
   const doneCount = reviewed.filter((decision) => decision.completion === 'done').length;
   const partialCount = reviewed.filter((decision) => decision.completion === 'partial').length;
-  const abandonedCount = reviewed.filter(
-    (decision) => decision.focusRunOutcome === 'abandoned'
-  ).length;
+  const abandonedCount = reviewed.filter((decision) => decision.focusRunOutcome === 'abandoned').length;
   const skipCount = reviewed.filter((decision) => decision.completion === 'skipped').length;
-  const swapHeavyCount = reviewed.filter(
-    (decision) => (decision.swapCountBeforeSelection ?? 0) > 1
-  ).length;
+  const swapHeavyCount = reviewed.filter((decision) => (decision.swapCountBeforeSelection ?? 0) > 1).length;
   const recoveryBoost = Math.min(recovery.completedCount * 2, 12);
 
   const executionScore = clamp(
@@ -56,27 +52,9 @@ export function buildBehaviorProfile(
     driftScore,
     momentumState,
     momentumTitle: getMomentumTitle(momentumState, language),
-    momentumBody: getMomentumBody(
-      momentumState,
-      executionScore,
-      stabilityScore,
-      driftScore,
-      language
-    ),
-    identityTitle: getIdentityTitle(
-      executionScore,
-      stabilityScore,
-      driftScore,
-      recovery,
-      language
-    ),
-    identityBody: getIdentityBody(
-      executionScore,
-      stabilityScore,
-      driftScore,
-      recovery,
-      language
-    ),
+    momentumBody: getMomentumBody(momentumState, executionScore, stabilityScore, driftScore, language),
+    identityTitle: getIdentityTitle(executionScore, stabilityScore, driftScore, recovery, language),
+    identityBody: getIdentityBody(executionScore, stabilityScore, driftScore, recovery, language),
     lossLine: getLossLine(last, language),
     returnPull: getReturnPull(momentumState, streak, language),
   };
@@ -100,15 +78,12 @@ function inferMomentumState(
   return 'stable';
 }
 
-function getMomentumTitle(
-  state: BehaviorProfile['momentumState'],
-  language: SupportedLanguage
-) {
+function getMomentumTitle(state: BehaviorProfile['momentumState'], language: SupportedLanguage) {
   const copy = {
-    rising: { tr: 'Momentum yukseliyor', en: 'Momentum is rising' },
+    rising: { tr: 'Momentum yükseliyor', en: 'Momentum is rising' },
     stable: { tr: 'Ritim korunuyor', en: 'Rhythm is holding' },
-    fragile: { tr: 'Ritim hassas', en: 'Rhythm is fragile' },
-    cracked: { tr: 'Momentum catladi', en: 'Momentum cracked' },
+    fragile: { tr: 'Ritim inceldi', en: 'Rhythm is fragile' },
+    cracked: { tr: 'Momentum çatladı', en: 'Momentum cracked' },
   } as const;
 
   return copy[state][language === 'tr' ? 'tr' : 'en'];
@@ -124,13 +99,13 @@ function getMomentumBody(
   if (language === 'tr') {
     switch (state) {
       case 'rising':
-        return `Execution skoru ${executionScore}. Istikrar ${stabilityScore}. Sistem senden daha sert hamleler kaldirabildigini gormeye basladi.`;
+        return `Execution skoru ${executionScore}. İstikrar ${stabilityScore}. Sistem artık daha sert bir tempo taşıyabildiğini görüyor.`;
       case 'fragile':
-        return `Drift ${driftScore}. Bir temiz kapanis daha yaparsan ritim tekrar guclenir.`;
+        return `Drift ${driftScore}. Bugün tek temiz kapanış daha alırsan ritim yeniden oturur.`;
       case 'cracked':
-        return `Execution ${executionScore} seviyesine indi. Bugun hizli bir toparlanma hamlesi kritik.`;
+        return `Execution ${executionScore} seviyesine indi. Bugün hızlı bir toparlanma hamlesi şart.`;
       default:
-        return `Execution ${executionScore}. Istikrar ${stabilityScore}. Bir temiz kapanis daha bu paneli yukari iter.`;
+        return `Execution ${executionScore}. İstikrar ${stabilityScore}. Tek temiz kapanış bu paneli yukarı iter.`;
     }
   }
 
@@ -155,24 +130,24 @@ function getIdentityTitle(
 ) {
   if (executionScore >= 76 && stabilityScore >= 68) {
     return language === 'tr'
-      ? 'Execution daha cok varsayilanin oluyor'
+      ? 'Execution sende varsayılan olmaya başlıyor'
       : 'Execution is becoming your default';
   }
 
   if (recovery.completedCount >= Math.max(1, recovery.abandonedCount)) {
     return language === 'tr'
-      ? 'Koptugunda geri donmeyi ogreniyorsun'
+      ? 'Koptuğunda geri dönmeyi öğreniyorsun'
       : 'You are learning how to recover fast';
   }
 
   if (driftScore >= 62) {
     return language === 'tr'
-      ? 'Hala fazladan surtunme kaybediyorsun'
+      ? 'Hâlâ fazla momentum kaçırıyorsun'
       : 'You are still leaking too much momentum';
   }
 
   return language === 'tr'
-    ? 'Ritim kuruyorsun ama hala sertlesebilir'
+    ? 'Ritim kuruluyor ama daha sertleşebilir'
     : 'You are building rhythm, but it can still harden';
 }
 
@@ -185,25 +160,25 @@ function getIdentityBody(
 ) {
   if (executionScore >= 76 && stabilityScore >= 68) {
     return language === 'tr'
-      ? 'Kisa ve net hamleler sende kararsizlik yerine otomatik hareket olusturmaya basliyor.'
+      ? 'Kısa ve net hamleler sende tereddüdü otomatik harekete çevirmeye başlıyor.'
       : 'Short clean moves are starting to replace hesitation with automatic follow-through.';
   }
 
   if (recovery.completedCount >= Math.max(1, recovery.abandonedCount)) {
     return language === 'tr'
-      ? 'Bu iyi haber. Kaydiginda geri giris kasin gucleniyor.'
-      : 'That is a good sign. Your re-entry muscle is getting stronger.';
+      ? 'Bu güçlü bir sinyal. Kaydığında geri giriş kasın zayıflamıyor, güçleniyor.'
+      : 'That is a strong sign. When you slip, your re-entry muscle is getting stronger instead of weaker.';
   }
 
   if (driftScore >= 62) {
     return language === 'tr'
-      ? 'Fazla swap ve gec cikis seni asagi cekiyor. Daha erken kilit, daha hizli kapanis.'
+      ? 'Fazla swap ve geç çıkış seni aşağı çekiyor. Daha erken kilit, daha hızlı kapanış.'
       : 'Too much swapping and late exits are dragging you down. Lock earlier, close faster.';
   }
 
   return language === 'tr'
-    ? 'Sistem sende neyin kapandigini ogreniyor. Simdi amac temiz kapanislari siklastirmak.'
-    : 'The system is learning what actually closes for you. The next goal is more clean closes.';
+    ? 'Sistem sende neyin gerçekten kapandığını öğreniyor. Sıradaki iş, temiz kapanışları sıklaştırmak.'
+    : 'The system is learning what actually closes for you. The next move is more clean closes.';
 }
 
 function getLossLine(last: DecisionRecord | null, language: SupportedLanguage) {
@@ -211,19 +186,19 @@ function getLossLine(last: DecisionRecord | null, language: SupportedLanguage) {
 
   if (last.focusRunOutcome === 'abandoned') {
     return language === 'tr'
-      ? 'Son kosu yari yolda kirildi. Execution skoru bundan etkilendi.'
+      ? 'Son koşu yarı yolda kırıldı. Execution skoru darbe aldı.'
       : 'Your last run broke early. Execution score took a hit.';
   }
 
   if (last.completion === 'skipped') {
     return language === 'tr'
-      ? 'Son hamle acildi ama kapanmadi. Drift yukseliyor.'
+      ? 'Son hamle açıldı ama kapanmadı. Drift yükseliyor.'
       : 'Your last move opened but did not close. Drift is rising.';
   }
 
   if (last.focusRunOutcome === 'partial') {
     return language === 'tr'
-      ? 'Kismi kapanis ritmi tuttu ama tam kazanc cikmadi.'
+      ? 'Kısmi kapanış ritmi tuttu ama tam kazanç çıkmadı.'
       : 'Partial completion protected the rhythm, but the full gain did not land.';
   }
 
@@ -238,15 +213,15 @@ function getReturnPull(
   if (language === 'tr') {
     if (state === 'rising') {
       return streak >= 5
-        ? `${streak} gunluk seri buyuyor. Bugunku temiz kapanis kimligini sertlestirir.`
-        : 'Bugunku kapanis ritmi daha kalici hale getirir.';
+        ? `${streak} günlük seri büyüyor. Bugünkü temiz kapanış bu kimliği daha da sertleştirir.`
+        : 'Bugünkü temiz kapanış ritmi yarına taşır.';
     }
 
     if (state === 'cracked') {
-      return 'Bugun yapacagin tek toparlanma hamlesi kaybi buyutmeden kapatir.';
+      return 'Bugün alacağın tek toparlanma hamlesi kaybı büyümeden keser.';
     }
 
-    return 'Yarin daha kolay bir gun istiyorsan bugunu temiz kapat.';
+    return 'Yarını daha kolay istiyorsan bugünü temiz kapat.';
   }
 
   if (state === 'rising') {

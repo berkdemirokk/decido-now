@@ -71,11 +71,11 @@ function buildInsights(
       id: 'short-win-rate',
       title:
         language === 'tr'
-          ? 'Kisa hamleler sende daha sert kapaniyor'
+          ? 'Kısa hamleler sende daha iyi kapanıyor'
           : 'Short moves are closing harder for you',
       body:
         language === 'tr'
-          ? '10 dakikanin altindaki hamleler, uzun bloklardan daha sik tamamlandi.'
+          ? '10 dakikanın altındaki hamleler, uzun bloklardan daha sık tamamlandı.'
           : 'Moves under 10 minutes are closing more often than longer blocks.',
       metric: `${shortDone.length}/${short.length}`,
     });
@@ -86,11 +86,11 @@ function buildInsights(
       id: 'swap-friction',
       title:
         language === 'tr'
-          ? 'Fazla swap kapanisi eritiyor'
+          ? 'Fazla swap başlangıcı eritiyor'
           : 'Too many swaps are eroding follow-through',
       body:
         language === 'tr'
-          ? 'Secimden sonra fazla degistirmek, aksiyon baslangicini yavaslatiyor.'
+          ? 'Seçimden sonra yön değiştirmek aksiyona girişini yavaşlatıyor.'
           : 'Changing lanes after selection is slowing your start quality.',
       metric: `${swappedAbandoned.length}/${swapped.length}`,
     });
@@ -98,26 +98,26 @@ function buildInsights(
 
   insights.push({
     id: 'best-window',
-      title:
-        language === 'tr'
-          ? 'En guclu penceren netlesiyor'
-          : 'Your strongest execution window is getting clearer',
+    title:
+      language === 'tr'
+        ? 'En temiz penceren netleşiyor'
+        : 'Your strongest execution window is getting clearer',
     body:
       language === 'tr'
-        ? `${bestWindow} civari daha kolay kapanis cikariyorsun.`
+        ? `${bestWindow} civarında daha temiz kapanış alıyorsun.`
         : `You are closing more moves around ${bestWindow.toLowerCase()}.`,
     metric: bestWindow,
   });
 
   insights.push({
     id: 'recovery-rate',
-      title:
-        language === 'tr'
-          ? 'Koptugunda ne kadar hizli donuyorsun'
-          : 'How fast you return after a crack',
+    title:
+      language === 'tr'
+        ? 'Koptuğunda ne kadar hızlı dönüyorsun'
+        : 'How fast you return after a crack',
     body:
       language === 'tr'
-        ? 'Reset hamleleri ayni gun kullanildiginda ritim daha kolay geri geliyor.'
+        ? 'Aynı gün açılan reset hamleleri ritmi daha hızlı geri topluyor.'
         : 'Same-day reset moves are helping you get back into motion faster.',
     metric: `${recovery.completedCount}/${Math.max(recovery.triggeredCount, 1)}`,
     premium: true,
@@ -125,13 +125,10 @@ function buildInsights(
 
   insights.push({
     id: 'completion-rate',
-      title:
-        language === 'tr'
-          ? 'Kapanis oranin'
-          : 'Your live close rate',
+    title: language === 'tr' ? 'Canlı kapanış oranı' : 'Your live close rate',
     body:
       language === 'tr'
-        ? 'Bu oran, sistemin sana ne kadar dogru zorlukta hamle verdigini gosterir.'
+        ? 'Bu oran sistemin zorluğu sana ne kadar doğru ayarladığını gösterir.'
         : 'This is the clearest signal of whether the system is matching your real friction.',
     metric: `${completionRate}%`,
     premium: true,
@@ -145,25 +142,25 @@ function buildNextAdjustmentTitle(
   language: SupportedLanguage
 ) {
   if (reviewed.length < 3) {
-    return language === 'tr' ? 'Once ritmi kilitle' : 'Lock the rhythm first';
+    return language === 'tr' ? 'Önce ritmi kilitle' : 'Lock the rhythm first';
   }
 
   const swapHeavy = reviewed.filter((decision) => (decision.swapCountBeforeSelection ?? 0) > 1).length;
   if (swapHeavy >= 2) {
     return language === 'tr'
-      ? 'Secimi daha erken kilitle'
+      ? 'Seçimi daha erken kilitle'
       : 'Lock the choice earlier';
   }
 
   const lateRuns = reviewed.filter((decision) => new Date(decision.createdAt).getHours() >= 21).length;
   if (lateRuns >= 2) {
     return language === 'tr'
-      ? 'Gunu daha erken kapat'
+      ? 'Günü daha erken kapat'
       : 'Close the day earlier';
   }
 
   return language === 'tr'
-    ? 'Ayni formati tekrar et'
+    ? 'Aynı formatı tekrar et'
     : 'Repeat the format that is working';
 }
 
@@ -174,25 +171,25 @@ function buildNextAdjustmentBody(
 ) {
   if (reviewed.length < 3) {
     return language === 'tr'
-      ? 'Bir kac kisa hamle daha kapat. Sistem ondan sonra daha sert kaliplar gostermeye baslar.'
+      ? 'Önce birkaç kısa hamleyi temiz kapat. Sistem net veriyi görünce daha sertleşir.'
       : 'Close a few more short moves. The system gets sharper once it has more clean closes.';
   }
 
   const swapHeavy = reviewed.filter((decision) => (decision.swapCountBeforeSelection ?? 0) > 1).length;
   if (swapHeavy >= 2) {
     return language === 'tr'
-      ? 'Fazla swap seni baslamadan sogutuyor. Ilk temiz secimi daha az boz.'
+      ? 'Fazla swap başlama ısını düşürüyor. İlk temiz seçimi daha az boz.'
       : 'Too much swapping is cooling your start. Disturb the first clean choice less.';
   }
 
   if (recovery.completedCount > 0 && recovery.completedCount >= Math.max(1, recovery.abandonedCount)) {
     return language === 'tr'
-      ? 'Ayni gun toparlanma sende ise yariyor. Koptugun anda kisa reset daha erken ac.'
+      ? 'Aynı gün toparlanma sende çalışıyor. Koptuğun anda kısa reseti daha erken aç.'
       : 'Same-day recovery works for you. Open a short reset earlier when momentum cracks.';
   }
 
   return language === 'tr'
-    ? '10 dakikanin altindaki net hamleler sende daha guvenli. Zorlugu orada tut.'
+    ? '10 dakikanın altındaki net hamleler sende daha güvenli. Zorluğu burada tut.'
     : 'Sub-10-minute moves are giving you cleaner follow-through. Keep the difficulty there.';
 }
 
@@ -214,9 +211,9 @@ function inferBestWindow(decisions: DecisionRecord[], language: SupportedLanguag
   if (language === 'tr') {
     switch (best) {
       case 'afternoon':
-        return 'Ogleden sonra';
+        return 'Öğleden sonra';
       case 'evening':
-        return 'Aksam';
+        return 'Akşam';
       case 'night':
         return 'Gece';
       default:

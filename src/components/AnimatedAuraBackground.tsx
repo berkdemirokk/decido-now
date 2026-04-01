@@ -20,7 +20,7 @@ const systemIndex: Record<SystemId, number> = {
   reset: 4,
 };
 
-const colors = ['#f59e0b', '#166534', '#d4a017', '#60a5fa', '#1d4ed8'];
+const colors = ['#d6a94f', '#2e8b57', '#4fb0ff', '#55c7d9', '#7f74ff'];
 
 export function AnimatedAuraBackground({ systemId }: { systemId: SystemId }) {
   const colorProgress = useSharedValue(systemIndex[systemId]);
@@ -65,7 +65,7 @@ export function AnimatedAuraBackground({ systemId }: { systemId: SystemId }) {
     const backgroundColor = interpolateColor(
       colorProgress.value,
       [0, 1, 2, 3, 4],
-      ['#fbbf24', '#22c55e', '#fde68a', '#93c5fd', '#60a5fa']
+      ['#e8c47b', '#57c994', '#9bd1ff', '#8fe0ec', '#b0a7ff']
     );
 
     return {
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     width: 320,
     height: 320,
     borderRadius: 320,
-    opacity: 0.16,
+    opacity: 0.18,
   },
   secondaryAura: {
     position: 'absolute',
@@ -103,6 +103,6 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 280,
-    opacity: 0.11,
+    opacity: 0.12,
   },
 });

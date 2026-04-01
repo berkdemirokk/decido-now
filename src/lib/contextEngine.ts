@@ -27,7 +27,7 @@ export function applyContextAwareSuggestions(
     label = language === 'tr' ? 'Sabah ivmesi' : 'Morning momentum';
     ranked = ranked.sort((left, right) => getMorningWeight(right) - getMorningWeight(left));
   } else if (hour >= 21 || hour === 0) {
-    label = language === 'tr' ? 'Aksam reseti' : 'Evening reset';
+    label = language === 'tr' ? 'Akşam reseti' : 'Evening reset';
     const filtered = ranked.filter((suggestion) => isResetSuggestion(suggestion) || isReflectiveSuggestion(suggestion));
     const resetOnly = ranked.filter((suggestion) => isResetSuggestion(suggestion));
     ranked = filtered.length ? filtered : resetOnly.length ? resetOnly : ranked;
@@ -65,9 +65,9 @@ export function buildDecisionFatigueReset(language: SupportedLanguage): Suggesti
   if (language === 'tr') {
     return {
       id: 'reset-micro-meditation',
-      title: '2 dakikalik karar reseti',
-      action: 'Gozlerini kisaca dinlendir, 4 nefes boyunca sadece nefes cikisini say ve sonra tek sonraki hamleye don.',
-      reason: 'Arka arkaya swap yapmak karar yorgunlugunu buyutebilir. Kisa reset secim kalitesini temizler.',
+      title: '2 dakikalık karar reseti',
+      action: 'Gözlerini kısaca dinlendir, 4 nefes boyunca sadece nefes çıkışını say ve sonra tek sonraki hamleye dön.',
+      reason: 'Arka arkaya swap yapmak karar yorgunluğunu büyütebilir. Kısa reset seçim kalitesini temizler.',
       category: 'reset',
       preferredModes: ['reset', 'stuck'],
       energies: ['low', 'mid', 'high'],
@@ -101,9 +101,9 @@ export function buildRecoveryMove(
     return language === 'tr'
       ? {
           id: 'reset-late-save',
-          title: 'Gunu kurtaran 2 dakikalik reset',
-          action: 'Bir dakika nefesi duzle, bir dakika bugunu kapatacak tek seyi sec ve hemen uygula.',
-          reason: 'Bugun tamamen dusmeden once ritmi korumak icin en kisa geri giris bu.',
+          title: 'Günü kurtaran 2 dakikalık reset',
+          action: 'Bir dakika nefesi düzle, bir dakika bugünü kapatacak tek şeyi seç ve hemen uygula.',
+          reason: 'Bugün tamamen düşmeden önce ritmi korumak için en kısa geri giriş bu.',
           category: 'reset',
           preferredModes: ['reset', 'quick-win'],
           energies: ['low', 'mid', 'high'],
@@ -131,9 +131,9 @@ export function buildRecoveryMove(
     return language === 'tr'
       ? {
           id: 'reset-salvage-run',
-          title: 'Kosuyu kurtaran mini reset',
-          action: 'Yarida kalan kosudan sadece tek parca sec. Onu 2 dakika icinde temiz kapat.',
-          reason: 'Yarida kalmis hissi buyumeden ritmi geri almak icin bu daha dogru.',
+          title: 'Koşuyu kurtaran mini reset',
+          action: 'Yarıda kalan koşudan sadece tek parça seç. Onu 2 dakika içinde temiz kapat.',
+          reason: 'Yarıda kalmış hissi büyümeden ritmi geri almak için bu daha doğru.',
           category: 'reset',
           preferredModes: ['reset', 'stuck'],
           energies: ['low', 'mid', 'high'],

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AppData, Category, DecisionRecord } from '../types';
+import { inferDirectionFromSystem } from './directionEngine';
 import { toLocalDateKey } from './entitlements';
 
 const STORAGE_KEY = 'decido-now.app-data.v1';
@@ -27,7 +28,9 @@ export function createDefaultAppData(now = new Date()): AppData {
     onboardingDone: false,
     onboardingCompletedAt: null,
     firstActivatedAt: now.toISOString(),
-    currentSystem: 'decide',
+    currentDirection: 'mind',
+    currentDirectionChosenAt: null,
+    currentSystem: 'learn',
     usage: {
       dateKey: todayKey,
       movesUsed: 0,
@@ -140,6 +143,10 @@ export function normalizeAppData(raw: Partial<AppData>, now = new Date()): AppDa
     onboardingDone: raw.onboardingDone ?? defaults.onboardingDone,
     onboardingCompletedAt,
     firstActivatedAt: raw.firstActivatedAt ?? firstMeaningfulStart,
+    currentDirection:
+      raw.currentDirection ??
+      inferDirectionFromSystem(raw.currentSystem ?? defaults.currentSystem),
+    currentDirectionChosenAt: raw.currentDirectionChosenAt ?? raw.onboardingCompletedAt ?? null,
     usage: {
       ...defaults.usage,
       ...(raw.usage ?? {}),

@@ -1,17 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
-import { LiveActivityMock } from '../components/LiveActivityMock';
 import { UiCopy } from '../lib/uiCopy';
-import { Suggestion } from '../types';
-import { theme } from '../theme';
+import { Suggestion, SupportedLanguage } from '../types';
 
 export interface FocusRunViewModel {
   visible: boolean;
@@ -27,6 +28,7 @@ export interface FocusRunViewModel {
 
 interface FocusRunScreenProps {
   copy: UiCopy;
+  language: SupportedLanguage;
   state: FocusRunViewModel;
   onStart: () => void;
   onNext: () => void;
@@ -48,173 +50,179 @@ export function FocusRunScreen({
   onLeaveAnyway,
   onScore,
 }: FocusRunScreenProps) {
-  const isTurkish = copy.tabs.today === 'Bugun';
   const entry = useSharedValue(0);
+  const pulse = useSharedValue(1);
+  const flash = useSharedValue(0);
+  const [showSecondaryAction, setShowSecondaryAction] = useState(false);
 
   useEffect(() => {
     entry.value = withTiming(state.visible ? 1 : 0, {
-      duration: 220,
+      duration: 180,
       easing: Easing.out(Easing.cubic),
     });
   }, [entry, state.visible]);
+
+  useEffect(() => {
+    if (
+      state.visible &&
+      (state.phase === 'active' || state.phase === 'halfway' || state.phase === 'nearFinish')
+    ) {
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(1.025, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+          withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) })
+        ),
+        -1,
+        false
+      );
+      return;
+    }
+
+    cancelAnimation(pulse);
+    pulse.value = withTiming(1, { duration: 140 });
+  }, [pulse, state.phase, state.visible]);
+
+  useEffect(() => {
+    if (state.visible && state.phase === 'score') {
+      flash.value = withSequence(
+        withTiming(0.14, { duration: 90, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 260, easing: Easing.out(Easing.quad) })
+      );
+      return;
+    }
+
+    flash.value = 0;
+  }, [flash, state.phase, state.visible]);
+
+  useEffect(() => {
+    setShowSecondaryAction(false);
+
+    if (!state.visible) {
+      return;
+    }
+
+    const shouldDelaySecondary =
+      state.phase === 'prestart' ||
+      state.phase === 'active' ||
+      state.phase === 'halfway' ||
+      state.phase === 'nearFinish';
+
+    if (!shouldDelaySecondary) {
+      return;
+    }
+
+    const delay = state.phase === 'prestart' ? 900 : 5000;
+    const timeout = setTimeout(() => {
+      setShowSecondaryAction(true);
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [state.phase, state.visible]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: entry.value,
     transform: [{ translateY: (1 - entry.value) * 18 }],
   }));
 
+  const timerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
+  const flashStyle = useAnimatedStyle(() => ({
+    opacity: flash.value,
+  }));
+
   if (!state.visible || !state.move) {
     return null;
   }
 
-  const progress = 1 - state.secondsLeft / Math.max(1, state.totalSeconds);
-  const currentStepName =
-    state.phase === 'prestart'
-      ? state.move.title
-      : state.steps[state.currentStep] ?? state.move.action;
-  const statusTone =
-    state.easyMode || state.move.id.startsWith('reset-')
-      ? copy.focusRun.recoveryLine
-      : state.phase === 'prestart'
-        ? copy.focusRun.prestartLine
-        : copy.focusRun.activeLine;
+  const currentStep = state.steps[state.currentStep] ?? state.move.action;
+  const stepLine = state.phase === 'prestart' ? state.move.action : currentStep;
 
   return (
     <Modal animationType="slide" presentationStyle="fullScreen" visible={state.visible}>
-      <Animated.View style={[styles.container, animatedStyle]}>
+      <Animated.View style={[styles.screen, animatedStyle]}>
         <StatusBar hidden />
+        <Animated.View pointerEvents="none" style={[styles.flashOverlay, flashStyle]} />
 
-        <View style={styles.chromeFade} />
-
-        <View style={styles.topBlock}>
-          <Text style={styles.eyebrow}>{copy.focusRun.title.toUpperCase()}</Text>
-          <View style={styles.headerRow}>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>
-                {state.phase === 'prestart'
-                  ? isTurkish
-                    ? 'KILIT ONCESI'
-                    : 'PRE-COMMIT'
-                  : state.phase === 'score'
-                    ? isTurkish
-                      ? 'KAPANIS'
-                      : 'CLOSEOUT'
-                    : isTurkish
-                      ? 'RUN CANLI'
-                      : 'RUN LIVE'}
-              </Text>
-            </View>
-            <Text style={styles.windowText}>
-              {state.easyMode
-                ? isTurkish
-                  ? '2 DAKIKALIK KURTARMA'
-                  : '2-MINUTE SAVE'
-                : isTurkish
-                  ? 'BUGUNUN KAPANISI'
-                  : "TODAY'S CLOSE"}
-            </Text>
-          </View>
-          <Text style={styles.title}>{state.move.title}</Text>
-          <Text style={styles.commitLine}>{statusTone}</Text>
-          {state.phase === 'prestart' ? (
-            <Text style={styles.lockLine}>{copy.focusRun.lockLine}</Text>
-          ) : null}
+        <View style={styles.header}>
+          <Text style={styles.title}>{copy.focusRun.title}</Text>
+          <Text style={styles.subtitle}>{copy.focusRun.subtitle}</Text>
         </View>
 
-        <View style={styles.liveShell}>
-          <LiveActivityMock
-            stepName={currentStepName}
-            progress={progress}
-            timeRemaining={formatTimer(state.secondsLeft)}
-          />
-        </View>
-
-        <View style={styles.timerShell}>
-          <Text style={styles.timerLabel}>
-            {state.phase === 'halfway'
-              ? copy.focusRun.halfway
-              : state.phase === 'nearFinish'
-                ? copy.focusRun.nearFinish
-                : state.easyMode
-                  ? copy.focusRun.makeEasier
-                  : isTurkish
-                    ? 'HAMLE CANLI'
-                    : 'MOVE LIVE'}
+        <View style={styles.center}>
+          <Text numberOfLines={1} style={styles.moveLabel}>
+            {state.move.title}
           </Text>
-          <Text style={styles.timerValue}>{formatTimer(state.secondsLeft)}</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${Math.max(8, progress * 100)}%` }]} />
-          </View>
+
+          <Animated.View style={[styles.timerWrap, timerStyle]}>
+            <View style={styles.timerHalo} />
+            <View style={styles.timerCore}>
+            <Text style={styles.timer}>{formatTimer(state.secondsLeft)}</Text>
+            </View>
+          </Animated.View>
+
+          <Text numberOfLines={2} style={styles.stepLine}>
+            {stepLine}
+          </Text>
         </View>
 
-        {state.phase === 'prestart' ? (
-          <View style={styles.prestart}>
-            <View style={styles.commitCard}>
-              <Text style={styles.commitCardLabel}>
-                {isTurkish ? 'SIMDI YAPACAGIN' : 'YOUR NEXT ACTION'}
-              </Text>
-              <Text style={styles.stepText}>{state.move.action}</Text>
-            </View>
-            <Pressable onPress={onStart} style={styles.primaryButton}>
-              <Text style={styles.primaryText}>{copy.focusRun.start}</Text>
-            </Pressable>
-            <Pressable onPress={onMakeEasier} style={styles.secondaryButton}>
-              <Text style={styles.secondaryText}>{copy.focusRun.makeEasier}</Text>
-            </Pressable>
-          </View>
-        ) : state.phase === 'score' ? (
-          <View style={styles.scoreState}>
-            <Text style={styles.completedTitle}>{copy.focusRun.completed}</Text>
-            <Text style={styles.completedBody}>{copy.focusRun.completedBody}</Text>
-            <Text style={styles.scorePrompt}>{copy.focusRun.scorePrompt}</Text>
-            <View style={styles.scoreRow}>
-              {[1, 2, 3, 4, 5].map((score) => (
-                <Pressable
-                  key={score}
-                  onPress={() => onScore(score as 1 | 2 | 3 | 4 | 5)}
-                  style={styles.scoreChip}
-                >
-                  <Text style={styles.scoreChipText}>{score}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.activeState}>
-            <Text style={styles.stepLabel}>
-              {isTurkish ? 'ADIM' : 'STEP'} {Math.min(state.currentStep + 1, state.steps.length)}{' '}
-              {isTurkish ? '/' : 'OF'} {state.steps.length}
-            </Text>
-            <Text style={styles.stepText}>{state.steps[state.currentStep] ?? state.move.action}</Text>
-            <View style={styles.actionRow}>
-              <Pressable onPress={onAskLeave} style={styles.secondaryButton}>
-                <Text style={styles.secondaryText}>{copy.focusRun.leave}</Text>
+        <View style={styles.footer}>
+          {state.phase === 'prestart' ? (
+            <>
+              <Pressable onPress={onStart} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>{copy.focusRun.start}</Text>
               </Pressable>
-              <Pressable onPress={onNext} style={styles.primaryButtonCompact}>
-                <Text style={styles.primaryText}>
-                  {state.currentStep >= state.steps.length - 1
-                    ? copy.focusRun.finish
-                    : copy.focusRun.next}
+
+              <View pointerEvents={showSecondaryAction ? 'auto' : 'none'} style={styles.secondarySlot}>
+                <Pressable onPress={onMakeEasier} style={[styles.tertiaryButton, !showSecondaryAction ? styles.secondaryHidden : null]}>
+                  <Text style={styles.tertiaryButtonText}>{copy.focusRun.makeEasier}</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : state.phase === 'score' ? (
+            <>
+              <Text style={styles.scorePrompt}>{copy.focusRun.scorePrompt}</Text>
+              <View style={styles.scoreRow}>
+                {[1, 2, 3, 4, 5].map((score) => (
+                  <Pressable
+                    key={score}
+                    onPress={() => onScore(score as 1 | 2 | 3 | 4 | 5)}
+                    style={styles.scoreChip}
+                  >
+                    <Text style={styles.scoreChipText}>{score}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : (
+            <>
+              <Pressable onPress={onNext} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>
+                  {state.currentStep >= state.steps.length - 1 ? copy.focusRun.finish : copy.focusRun.next}
                 </Text>
               </Pressable>
-            </View>
-          </View>
-        )}
+
+              <View pointerEvents={showSecondaryAction ? 'auto' : 'none'} style={styles.secondarySlot}>
+                <Pressable onPress={onAskLeave} style={[styles.leaveButton, !showSecondaryAction ? styles.secondaryHidden : null]}>
+                  <Text style={styles.leaveButtonText}>{copy.focusRun.leave}</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </View>
 
         {state.phase === 'leaveConfirm' ? (
-          <View style={styles.leaveCard}>
-            <Text style={styles.leaveTitle}>{copy.focusRun.leaveTitle}</Text>
-            <Text style={styles.leaveBody}>{copy.focusRun.leaveBody}</Text>
-            <Text style={styles.leaveHint}>{copy.focusRun.partialFollowUp}</Text>
-            <View style={styles.leaveActions}>
-              <Pressable onPress={onResume} style={styles.secondaryButton}>
-                <Text style={styles.secondaryText}>{copy.focusRun.resume}</Text>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{copy.focusRun.leaveTitle}</Text>
+
+              <Pressable onPress={onResume} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>{copy.focusRun.resume}</Text>
               </Pressable>
-              <Pressable onPress={onMakeEasier} style={styles.secondaryButton}>
-                <Text style={styles.secondaryText}>{copy.focusRun.easyVersion}</Text>
-              </Pressable>
-              <Pressable onPress={onLeaveAnyway} style={styles.leaveDanger}>
-                <Text style={styles.leaveDangerText}>{copy.focusRun.leaveAnyway}</Text>
+
+              <Pressable onPress={onLeaveAnyway} style={styles.modalSecondary}>
+                <Text style={styles.modalSecondaryText}>{copy.focusRun.leave}</Text>
               </Pressable>
             </View>
           </View>
@@ -235,253 +243,222 @@ function formatTimer(totalSeconds: number) {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: '#010101',
-    padding: theme.spacing.xl,
+    backgroundColor: '#0B0B0F',
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 40,
     justifyContent: 'space-between',
   },
-  chromeFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 180,
-    backgroundColor: 'rgba(212,162,76,0.03)',
+  flashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
   },
-  topBlock: {
-    gap: theme.spacing.sm,
-  },
-  eyebrow: {
-    color: theme.colors.accent,
-    fontSize: theme.typography.meta,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  header: {
     alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  statusPill: {
-    alignSelf: 'flex-start',
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-  },
-  statusPillText: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.meta,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  windowText: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.meta,
-    fontWeight: '700',
-    letterSpacing: 1,
+    gap: 4,
+    paddingTop: 4,
   },
   title: {
-    color: theme.colors.text,
-    fontSize: theme.typography.display,
-    lineHeight: 40,
-    fontWeight: '700',
-  },
-  commitLine: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
-    lineHeight: 23,
-    fontWeight: '600',
-  },
-  lockLine: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
+    color: '#FFFFFF',
+    fontSize: 18,
     lineHeight: 22,
-  },
-  liveShell: {
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceAlt,
-    padding: 2,
-  },
-  timerShell: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    padding: theme.spacing.xl,
-    gap: theme.spacing.md,
-    ...theme.shadow.gold,
-  },
-  timerLabel: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.meta,
     fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: -0.2,
+  },
+  subtitle: {
+    color: 'rgba(255,255,255,0.62)',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  moveLabel: {
+    maxWidth: 300,
+    color: 'rgba(255,255,255,0.46)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     letterSpacing: 1.2,
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
-  timerValue: {
-    color: theme.colors.text,
-    fontSize: 54,
-    fontWeight: '800',
+  timerWrap: {
+    width: 252,
+    height: 252,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  progressBar: {
-    height: 8,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.surfaceMuted,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: theme.colors.accent,
-  },
-  prestart: {
-    gap: theme.spacing.md,
-  },
-  commitCard: {
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.surfaceAlt,
+  timerHalo: {
+    position: 'absolute',
+    width: 252,
+    height: 252,
+    borderRadius: 126,
     borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
+    borderColor: 'rgba(108,92,231,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    shadowColor: '#6C5CE7',
+    shadowOpacity: 0.22,
+    shadowRadius: 34,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
   },
-  commitCardLabel: {
-    color: theme.colors.accent,
-    fontSize: theme.typography.meta,
+  timerCore: {
+    minWidth: 220,
+    minHeight: 220,
+    borderRadius: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(21,21,28,0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  timer: {
+    color: '#FFFFFF',
+    fontSize: 100,
+    lineHeight: 104,
     fontWeight: '800',
-    letterSpacing: 1.1,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: -4.8,
+    textAlign: 'center',
   },
-  activeState: {
-    gap: theme.spacing.lg,
+  stepLine: {
+    maxWidth: 290,
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    textAlign: 'center',
   },
-  stepLabel: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.meta,
-    fontWeight: '700',
-    letterSpacing: 1,
+  footer: {
+    gap: 12,
   },
-  stepText: {
-    color: theme.colors.text,
-    fontSize: theme.typography.h1,
-    lineHeight: 34,
-    fontWeight: '700',
+  secondarySlot: {
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  actionRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
+  secondaryHidden: {
+    opacity: 0,
   },
   primaryButton: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent,
-    paddingVertical: 18,
+    width: '100%',
+    minHeight: 58,
+    borderRadius: 20,
+    backgroundColor: '#6C5CE7',
     alignItems: 'center',
-    ...theme.shadow.gold,
+    justifyContent: 'center',
+    shadowColor: '#6C5CE7',
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
   },
-  primaryButtonCompact: {
-    flex: 1,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent,
-    paddingVertical: 16,
-    alignItems: 'center',
-    ...theme.shadow.gold,
-  },
-  primaryText: {
-    color: '#120b03',
-    fontSize: theme.typography.body,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    flex: 1,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceAlt,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  secondaryText: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
   },
-  scoreState: {
-    gap: theme.spacing.md,
+  tertiaryButton: {
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
-  completedTitle: {
-    color: theme.colors.text,
-    fontSize: theme.typography.h1,
-    fontWeight: '700',
+  tertiaryButtonText: {
+    color: 'rgba(255,255,255,0.42)',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
-  completedBody: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
-    lineHeight: 22,
+  leaveButton: {
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  leaveButtonText: {
+    color: 'rgba(255,255,255,0.38)',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
   scorePrompt: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
-    fontWeight: '700',
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
   },
   scoreRow: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    justifyContent: 'space-between',
+    gap: 10,
   },
   scoreChip: {
     flex: 1,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceAlt,
+    minHeight: 48,
+    borderRadius: 16,
+    backgroundColor: '#15151C',
     alignItems: 'center',
-    paddingVertical: 16,
+    justifyContent: 'center',
   },
   scoreChipText: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
-    fontWeight: '800',
-  },
-  leaveCard: {
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceAlt,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  leaveTitle: {
-    color: theme.colors.text,
-    fontSize: theme.typography.h2,
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
   },
-  leaveBody: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
-    lineHeight: 22,
-  },
-  leaveHint: {
-    color: theme.colors.accent,
-    fontSize: theme.typography.body,
-    fontWeight: '700',
-  },
-  leaveActions: {
-    gap: theme.spacing.sm,
-  },
-  leaveDanger: {
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(234,124,143,0.28)',
-    backgroundColor: 'rgba(234,124,143,0.08)',
-    paddingVertical: 16,
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
   },
-  leaveDangerText: {
-    color: theme.colors.danger,
-    fontSize: theme.typography.body,
-    fontWeight: '800',
+  modalCard: {
+    width: '100%',
+    borderRadius: 20,
+    backgroundColor: '#15151C',
+    padding: 24,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  modalSecondary: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryText: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
 });

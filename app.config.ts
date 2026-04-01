@@ -7,7 +7,7 @@ export default ({ config: incomingConfig }: ConfigContext): ExpoConfig => {
   let config: ExpoConfig = {
     ...incomingConfig,
     ...appJson.expo,
-    plugins: ['expo-iap'],
+    plugins: ['expo-font', 'expo-iap'],
   };
 
   config = withEntitlementsPlist(config, (entitlementsConfig) => {

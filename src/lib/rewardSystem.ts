@@ -1,4 +1,4 @@
-﻿import { CompletionState, DecisionRecord, SupportedLanguage } from '../types';
+import { CompletionState, DecisionRecord, SupportedLanguage } from '../types';
 
 const LEVELS = [
   { name: 'Beginner', minXp: 0 },
@@ -21,10 +21,7 @@ export interface RewardResult {
   message: string;
 }
 
-export function buildRewardProfile(
-  decisions: DecisionRecord[],
-  language: SupportedLanguage
-): RewardProfile {
+export function buildRewardProfile(decisions: DecisionRecord[], language: SupportedLanguage): RewardProfile {
   const xp = decisions
     .filter((decision) => decision.reviewedAt)
     .reduce((sum, decision) => sum + getDecisionXp(decision.completion, decision.resultScore), 0);
@@ -34,10 +31,7 @@ export function buildRewardProfile(
   const nextLevel = LEVELS[currentLevelIndex + 1] ?? null;
   const currentFloor = currentLevel.minXp;
   const nextFloor = nextLevel?.minXp ?? currentFloor + 140;
-  const progressPct = Math.max(
-    0,
-    Math.min(1, (xp - currentFloor) / Math.max(1, nextFloor - currentFloor))
-  );
+  const progressPct = Math.max(0, Math.min(1, (xp - currentFloor) / Math.max(1, nextFloor - currentFloor)));
   const strongCount = decisions.filter((decision) => (decision.resultScore ?? 0) >= 4).length;
 
   return {
@@ -48,8 +42,8 @@ export function buildRewardProfile(
     momentumLine:
       language === 'tr'
         ? strongCount >= 5
-          ? 'Son kapanislarda momentum net sekilde birikiyor.'
-          : 'Skorlanan her hamle sistemi ve ritmini daha sert okutur.'
+          ? 'Son kapanışlarda momentum net şekilde birikiyor.'
+          : 'Skorlanan her hamle sistemi ve ritmini daha sert okutuyor.'
         : strongCount >= 5
           ? 'Your recent closes are stacking visible momentum.'
           : 'Every scored move sharpens both the system and your rhythm.',
@@ -77,15 +71,15 @@ export function buildRewardResult(
     message:
       language === 'tr'
         ? completion === 'done'
-          ? 'Bugun korundu. Temiz bir hamle kapattin.'
+          ? 'Bugün korundu. Temiz bir hamle kapattın.'
           : completion === 'partial'
-            ? 'Tam kapanmadi ama bugun hala toparlanabilir.'
-            : 'Bugun kaydi. En hizli cikis akilli bir toparlanma hamlesi.'
+            ? 'Tam kapanmadı ama gün hâlâ kurtarılabilir.'
+            : 'Bu hamle kaydı. En hızlı çıkış net bir toparlanma hamlesi.'
         : completion === 'done'
           ? 'Today is secured. You closed a clean move.'
           : completion === 'partial'
-            ? 'It did not fully close, but the day can still be salvaged.'
-            : 'This one slipped. The fastest path now is a smart recovery move.',
+            ? 'It did not fully close, but the day can still be saved.'
+            : 'This one slipped. The fastest way back is a clean recovery move.',
   };
 }
 
@@ -115,4 +109,3 @@ function getCurrentLevelIndex(xp: number) {
   }
   return index;
 }
-

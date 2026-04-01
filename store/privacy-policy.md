@@ -1,10 +1,10 @@
-# Decido Privacy Policy
+# Decido Now Privacy Policy
 
 Effective date: March 30, 2026
 
 ## Overview
 
-Decido is a decision support app designed to help users choose one small action quickly, track whether they completed it, and view patterns from their own decision history.
+Decido Now is a decision support app designed to help users choose one small action quickly, track whether they completed it, and view patterns from their own decision history.
 
 ## What data the app stores
 
@@ -49,13 +49,13 @@ AI coaching is optional and the app can fall back to local summaries when no AI 
 
 ## What data is not collected by default
 
-Decido does not currently require account creation.
-Decido does not currently collect email, name, phone number, contacts, photos, or precise location by default.
-Decido does not currently sell user data to third parties.
+Decido Now does not currently require account creation.
+Decido Now does not currently collect email, name, phone number, contacts, photos, or precise location by default.
+Decido Now does not currently sell user data to third parties.
 
 ## Payments
 
-If in-app purchases are enabled in a future release, payments will be processed through Apple In-App Purchase. Decido itself will not store full payment card details.
+If in-app purchases are enabled in a future release, payments will be processed through Apple In-App Purchase. Decido Now itself will not store full payment card details.
 
 ## Analytics and diagnostics
 
@@ -67,7 +67,7 @@ Users can delete the app to remove locally stored data from the device. If cloud
 
 ## Children
 
-Decido is not designed for children under 13.
+Decido Now is not designed for children under 13.
 
 ## Changes
 

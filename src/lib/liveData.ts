@@ -89,7 +89,7 @@ export async function getLearnCard(language: SupportedLanguage): Promise<LearnCa
     const fallback: LearnCard = {
       title: topic,
       body: buildFallbackLearnBody(language),
-      sourceLabel: 'Decido',
+      sourceLabel: 'Decido Now',
       fetchedAt: new Date().toISOString(),
     };
 
@@ -183,7 +183,7 @@ export async function getLanguageCard(
         language === 'tr'
           ? 'Bugun 5 kelime sec, her biriyle bir cumle kur ve sesli tekrar et.'
           : 'Pick 5 words today, build one sentence for each, and repeat them out loud.',
-      sourceLabel: 'Decido',
+      sourceLabel: 'Decido Now',
       fetchedAt: new Date().toISOString(),
     };
 
@@ -251,12 +251,12 @@ function buildLocalCoachInsight(
       ? {
           title: 'Bugun tek temiz hamle ara',
           body: 'Senden istedigim sey buyuk bir plan degil. 10-15 dakikalik, sonucu gorunur tek bir adim sec.',
-          sourceLabel: 'Decido Coach',
+          sourceLabel: 'Decido Now Coach',
         }
       : {
           title: 'Look for one clean move today',
           body: 'You do not need a huge plan. Pick one visible step that fits into 10 to 15 minutes.',
-          sourceLabel: 'Decido Coach',
+          sourceLabel: 'Decido Now Coach',
         };
   }
 
@@ -280,12 +280,12 @@ function buildLocalCoachInsight(
     ? {
         title: `Bugun ${minutes} dakikalik bir blok daha iyi duruyor`,
         body: `${top.context.goal} niyetiyle ve ${top.context.friction} hissindeyken kisa, net kararlar sende daha iyi calisiyor.`,
-        sourceLabel: 'Decido Coach',
+        sourceLabel: 'Decido Now Coach',
       }
     : {
         title: `A ${minutes}-minute block looks strongest today`,
         body: `When your goal is ${top.context.goal} and the blocker feels like ${top.context.friction}, short visible actions tend to work best for you.`,
-        sourceLabel: 'Decido Coach',
+        sourceLabel: 'Decido Now Coach',
       };
 }
 

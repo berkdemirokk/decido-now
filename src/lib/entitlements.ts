@@ -1,8 +1,9 @@
-import { AppData, PlanTier, UserAccessState, UserEntitlements } from '../types';
+import { AppData, DecisionRecord, PlanTier, UserAccessState, UserEntitlements } from '../types';
 
-export const ACTIVATION_PHASE_DAYS = 3;
+export const ACTIVATION_PHASE_DAYS = 7;
+export const ACTIVATION_PHASE_CLEAN_CLOSES = 5;
 const PREMIUM_MOVE_LIMIT = 999;
-const PREMIUM_SWAP_LIMIT = 6;
+const PREMIUM_SWAP_LIMIT = 8;
 
 export function toLocalDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -49,10 +50,23 @@ export function getActivationPhaseEndsAt(appData: AppData) {
   return end.toISOString();
 }
 
+export function isCleanClose(decision: DecisionRecord) {
+  return (
+    decision.completion === 'done' &&
+    decision.focusRunOutcome !== 'abandoned' &&
+    (decision.resultScore ?? 0) >= 4
+  );
+}
+
+export function getCleanCloseCount(appData: AppData) {
+  return appData.decisions.filter(isCleanClose).length;
+}
+
 export function isActivationPhase(appData: AppData, now = new Date()) {
   if (isPremiumPlan(appData.subscription.plan)) return false;
   const day = getActivationDay(appData, now);
-  return day !== null && day <= ACTIVATION_PHASE_DAYS;
+  const cleanCloses = getCleanCloseCount(appData);
+  return day !== null && day <= ACTIVATION_PHASE_DAYS && cleanCloses < ACTIVATION_PHASE_CLEAN_CLOSES;
 }
 
 export function buildEntitlements(appData: AppData, now = new Date()): UserEntitlements {
@@ -77,10 +91,10 @@ export function buildEntitlements(appData: AppData, now = new Date()): UserEntit
       phase: 'activation',
       isActivationPhase: true,
       isPremium: false,
-      moveLimit: 3,
-      swapLimit: 1,
-      focusRunLimit: 3,
-      guidanceTier: 'basic',
+      moveLimit: 4,
+      swapLimit: 2,
+      focusRunLimit: 4,
+      guidanceTier: 'full',
       premiumInsights: false,
       premiumRecovery: false,
       streakProtection: false,

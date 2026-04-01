@@ -45,7 +45,7 @@ export function WidgetPreview({
       </View>
       <View style={styles.mediumBottom}>
         <Text style={styles.startLink}>Start</Text>
-        <Text style={styles.deepLinkHint}>decidonow://start</Text>
+        <Text style={styles.deepLinkHint}>decido://start</Text>
       </View>
     </View>
   );

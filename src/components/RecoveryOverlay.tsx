@@ -3,54 +3,49 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getUiCopy } from '../lib/uiCopy';
 import { SupportedLanguage } from '../types';
 
-interface RewardOverlayProps {
+interface RecoveryOverlayProps {
   visible: boolean;
-  xpGain: number;
-  levelBefore: string;
-  levelAfter: string;
-  title: string;
-  message: string;
-  detail: string;
-  buttonLabel: string;
-  onContinue: () => void;
+  language: SupportedLanguage;
+  source: 'abandon' | 'missed-day' | 'swap-fatigue';
+  ctaLabel: string;
+  onRecover: () => void;
 }
 
-export function RewardOverlay({
+export function RecoveryOverlay({
   visible,
-  title,
-  message,
-  detail,
-  buttonLabel,
-  onContinue,
-}: RewardOverlayProps) {
-  const language = inferLanguage(title, message, detail, buttonLabel);
-  const rewardCopy = getUiCopy(language).reward;
+  language,
+  source,
+  ctaLabel,
+  onRecover,
+}: RecoveryOverlayProps) {
+  const recoveryCopy = getUiCopy(language).recovery;
+
+  const body =
+    source === 'swap-fatigue'
+      ? recoveryCopy.swapFatigueBody
+      : source === 'missed-day'
+        ? recoveryCopy.missedDayBody
+        : recoveryCopy.abandonBody;
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onContinue}>
+    <Modal transparent animationType="fade" visible={visible}>
       <View style={styles.backdrop}>
         <View style={styles.content}>
           <View style={styles.copyBlock}>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{rewardCopy.badge}</Text>
+              <Text style={styles.badgeText}>{recoveryCopy.badge}</Text>
             </View>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{message}</Text>
-            {detail ? <Text style={styles.detail}>{detail}</Text> : null}
+            <Text style={styles.title}>{recoveryCopy.title}</Text>
+            <Text style={styles.subtitle}>{body}</Text>
           </View>
 
-          <Pressable onPress={onContinue} style={styles.button}>
-            <Text style={styles.buttonText}>{buttonLabel}</Text>
+          <Pressable onPress={onRecover} style={styles.button}>
+            <Text style={styles.buttonText}>{ctaLabel}</Text>
           </Pressable>
         </View>
       </View>
     </Modal>
   );
-}
-
-function inferLanguage(...parts: string[]): SupportedLanguage {
-  const combined = parts.join(' ');
-  return /[ğĞıİşŞçÇöÖüÜ]/.test(combined) ? 'tr' : 'en';
 }
 
 const styles = StyleSheet.create({
@@ -75,12 +70,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(0,212,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(0,212,255,0.24)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   badgeText: {
-    color: '#00D4FF',
+    color: 'rgba(255,255,255,0.58)',
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '800',
@@ -98,21 +93,13 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: 17,
-    lineHeight: 23,
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
     textAlign: 'center',
-  },
-  detail: {
-    maxWidth: 320,
-    color: 'rgba(255,255,255,0.44)',
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '500',
-    fontFamily: 'Inter_500Medium',
-    textAlign: 'center',
+    maxWidth: 300,
   },
   button: {
     width: '100%',
@@ -122,10 +109,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#6C5CE7',
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
   },
   buttonText: {
     color: '#FFFFFF',

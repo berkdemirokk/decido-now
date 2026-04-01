@@ -15,55 +15,55 @@ import {
 import { toLocalDateKey } from './entitlements';
 
 export const MODE_OPTIONS: Array<{ key: Mode; label: string; hint: string }> = [
-  { key: 'stuck', label: 'Tikandim', hint: 'Baslamak zor geliyorsa' },
-  { key: 'quick-win', label: 'Hizli Kazanc', hint: 'Kisa bir ilerleme istiyorsan' },
-  { key: 'deep-focus', label: 'Derin Odak', hint: 'Tek ise girmek istiyorsan' },
+  { key: 'stuck', label: 'Tıkandım', hint: 'Başlamak zor geliyorsa' },
+  { key: 'quick-win', label: 'Hızlı Kazanç', hint: 'Kısa bir ilerleme istiyorsan' },
+  { key: 'deep-focus', label: 'Derin Odak', hint: 'Tek işe girmek istiyorsan' },
   { key: 'reset', label: 'Reset', hint: 'Toparlanmak istiyorsan' },
-  { key: 'bold', label: 'Cesur Mod', hint: 'Erteledigine dokunmak istiyorsan' },
+  { key: 'bold', label: 'Cesur Mod', hint: 'Ertelediğine dokunmak istiyorsan' },
 ];
 
 export const GOAL_OPTIONS: Array<{ key: Goal; label: string; hint: string }> = [
-  { key: 'finish', label: 'Bitir', hint: 'Yarim kalan isi kapat' },
-  { key: 'learn', label: 'Ogren', hint: 'Bilgi ya da dil gelistir' },
-  { key: 'earn', label: 'Kazan', hint: 'Gelir veya para akisini guclendir' },
-  { key: 'build', label: 'Uret', hint: 'Fikir ya da proje ilerlet' },
-  { key: 'connect', label: 'Bag kur', hint: 'Birine ulas ya da iliskiyi isit' },
+  { key: 'finish', label: 'Bitir', hint: 'Yarım kalan işi kapat' },
+  { key: 'learn', label: 'Öğren', hint: 'Bilgi ya da dil geliştir' },
+  { key: 'earn', label: 'Kazan', hint: 'Gelir veya para akışını güçlendir' },
+  { key: 'build', label: 'Üret', hint: 'Fikir ya da proje ilerlet' },
+  { key: 'connect', label: 'Bağ kur', hint: 'Birine ulaş ya da ilişkiyi ısıt' },
   { key: 'reset', label: 'Toparlan', hint: 'Zihni ve bedeni rahatlat' },
 ];
 
 export const FRICTION_OPTIONS: Array<{ key: Friction; label: string; hint: string }> = [
-  { key: 'unclear', label: 'Belirsiz', hint: 'Ne yapacagim net degil' },
-  { key: 'distracted', label: 'Daginik', hint: 'Dikkatim dagilip duruyor' },
-  { key: 'tired', label: 'Yorgun', hint: 'Enerjim tasimiyor' },
-  { key: 'anxious', label: 'Kaygili', hint: 'Yanlis yapmaktan cekiniyorum' },
-  { key: 'avoidant', label: 'Kaciniyorum', hint: 'Biliyorum ama dokunmak istemiyorum' },
+  { key: 'unclear', label: 'Belirsiz', hint: 'Ne yapacağım net değil' },
+  { key: 'distracted', label: 'Dağınık', hint: 'Dikkatim dağılıp duruyor' },
+  { key: 'tired', label: 'Yorgun', hint: 'Enerjim taşımıyor' },
+  { key: 'anxious', label: 'Kaygılı', hint: 'Yanlış yapmaktan çekiniyorum' },
+  { key: 'avoidant', label: 'Kaçınıyorum', hint: 'Biliyorum ama dokunmak istemiyorum' },
 ];
 
 export const ENERGY_OPTIONS: Array<{ key: Energy; label: string }> = [
-  { key: 'low', label: 'Dusuk' },
+  { key: 'low', label: 'Düşük' },
   { key: 'mid', label: 'Orta' },
-  { key: 'high', label: 'Yuksek' },
+  { key: 'high', label: 'Yüksek' },
 ];
 
 export const TIME_OPTIONS = [5, 10, 15, 20, 30, 45];
 
 export const BUDGET_OPTIONS: Array<{ key: BudgetTier; label: string }> = [
   { key: 'free', label: '0 TL' },
-  { key: 'low', label: 'Dusuk' },
+  { key: 'low', label: 'Düşük' },
   { key: 'medium', label: 'Esnek' },
 ];
 
 export const CATEGORY_OPTIONS: Array<{ key: CategoryFilter; label: string }> = [
-  { key: 'mixed', label: 'Karisik' },
+  { key: 'mixed', label: 'Karışık' },
   { key: 'focus', label: 'Odak' },
   { key: 'health', label: 'Beden' },
-  { key: 'learn', label: 'Ogren' },
+  { key: 'learn', label: 'Öğren' },
   { key: 'language', label: 'Dil' },
   { key: 'earn', label: 'Gelir' },
   { key: 'money', label: 'Para' },
   { key: 'social', label: 'Sosyal' },
   { key: 'reset', label: 'Reset' },
-  { key: 'growth', label: 'Gelisim' },
+  { key: 'growth', label: 'Gelişim' },
 ];
 
 export const PLAN_LIMITS: Record<PlanTier, { dailyRequests: number; dailySkips: number }> = {
@@ -76,18 +76,18 @@ export const PLAN_LIMITS: Record<PlanTier, { dailyRequests: number; dailySkips: 
 export const CATEGORY_LABELS: Record<Category, string> = {
   focus: 'Odak',
   health: 'Beden',
-  learn: 'Ogren',
+  learn: 'Öğren',
   language: 'Dil',
   earn: 'Gelir',
   money: 'Para',
   social: 'Sosyal',
   reset: 'Reset',
-  growth: 'Gelisim',
+  growth: 'Gelişim',
 };
 
 export const COMPLETION_LABELS = {
-  done: 'Yapildi',
-  partial: 'Kismi',
+  done: 'Yapıldı',
+  partial: 'Kısmi',
   skipped: 'Ertelendi',
 };
 

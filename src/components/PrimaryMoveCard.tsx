@@ -1,312 +1,121 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Suggestion } from '../types';
-import { theme } from '../theme';
 
 interface PrimaryMoveCardProps {
   move: Suggestion;
-  kickerLabel: string;
+  accentColor: string;
+  directionLabel: string;
+  cardTitle?: string;
+  whyLabel: string;
+  impactLabel: string;
   reason: string;
   todayGain: string;
   tomorrowGain: string;
-  commitLabel: string;
-  commitBody: string;
-  whyLabel: string;
-  todayLabel: string;
-  tomorrowLabel: string;
-  streakLabel: string;
-  levelLabel: string;
   primaryCta: string;
   secondaryWhy: string;
   secondarySwap: string;
-  tertiaryRefine: string;
-  tertiaryShare: string;
   onStart: () => void;
   onWhy: () => void;
   onSwap: () => void;
-  onRefine: () => void;
-  onShare: () => void;
 }
 
 export function PrimaryMoveCard({
   move,
-  kickerLabel,
+  cardTitle,
   reason,
-  todayGain,
-  tomorrowGain,
-  commitLabel,
-  commitBody,
-  whyLabel,
-  todayLabel,
-  tomorrowLabel,
-  streakLabel,
-  levelLabel,
   primaryCta,
-  secondaryWhy,
-  secondarySwap,
-  tertiaryRefine,
-  tertiaryShare,
   onStart,
   onWhy,
   onSwap,
-  onRefine,
-  onShare,
 }: PrimaryMoveCardProps) {
   return (
     <View style={styles.card}>
-      <View style={styles.topAccent} />
+      <Text style={styles.cardTitle}>{cardTitle || move.title}</Text>
+      <Text style={styles.taskText}>{move.action}</Text>
 
-      <View style={styles.metaRow}>
-        <MetaChip label={streakLabel} />
-        <MetaChip label={levelLabel} />
-      </View>
-
-      <View style={styles.heroBlock}>
-        <Text style={styles.kicker}>{kickerLabel}</Text>
-        <Text style={styles.title}>{move.title}</Text>
-        <Text style={styles.action}>{move.action}</Text>
-      </View>
-
-      <View style={styles.commitFrame}>
-        <Text style={styles.commitLabel}>{commitLabel}</Text>
-        <Text style={styles.commitBody}>{commitBody}</Text>
-      </View>
-
-      <View style={styles.signalCard}>
-        <Text style={styles.signalLabel}>{whyLabel}</Text>
-        <Text style={styles.signalBody}>{reason}</Text>
-      </View>
-
-      <View style={styles.splitRow}>
-        <MiniPanel label={todayLabel} body={todayGain} emphasize />
-        <MiniPanel label={tomorrowLabel} body={tomorrowGain} />
-      </View>
-
-      <Pressable onPress={onStart} style={styles.primaryButton}>
-        <Text style={styles.primaryButtonText}>{primaryCta}</Text>
+      <Pressable
+        onPress={onWhy}
+        onLongPress={onSwap}
+        delayLongPress={320}
+        hitSlop={8}
+        style={styles.reasonAction}
+      >
+        <Text numberOfLines={1} style={styles.reasonText}>
+          {reason}
+        </Text>
       </Pressable>
 
-      <View style={styles.secondaryRow}>
-        <Pressable onPress={onWhy} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>{secondaryWhy}</Text>
-        </Pressable>
-        <Pressable onPress={onSwap} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>{secondarySwap}</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.tertiaryRow}>
-        <Pressable onPress={onRefine} style={styles.tertiaryButton}>
-          <Text style={styles.tertiaryText}>{tertiaryRefine}</Text>
-        </Pressable>
-        <Pressable onPress={onShare} style={styles.tertiaryButton}>
-          <Text style={styles.tertiaryText}>{tertiaryShare}</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function MetaChip({ label }: { label: string }) {
-  return (
-    <View style={styles.metaChip}>
-      <Text style={styles.metaText}>{label}</Text>
-    </View>
-  );
-}
-
-function MiniPanel({
-  label,
-  body,
-  emphasize = false,
-}: {
-  label: string;
-  body: string;
-  emphasize?: boolean;
-}) {
-  return (
-    <View style={[styles.miniPanel, emphasize ? styles.miniPanelStrong : null]}>
-      <Text style={styles.panelLabel}>{label}</Text>
-      <Text style={[styles.panelBody, emphasize ? styles.panelBodyStrong : null]}>{body}</Text>
+      <Pressable onPress={onStart} style={styles.cta}>
+        <Text style={styles.ctaText}>{primaryCta}</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
+    width: '100%',
+    borderRadius: 20,
+    backgroundColor: '#15151C',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
+    gap: 16,
+    shadowColor: '#000000',
+    shadowOpacity: 0.34,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 20 },
+    elevation: 16,
     borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    padding: theme.spacing.xl,
-    gap: theme.spacing.lg,
-    overflow: 'hidden',
-    ...theme.shadow.card,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  topAccent: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 5,
-    backgroundColor: theme.colors.accent,
+  cardTitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
-  metaRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  metaChip: {
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceAlt,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  metaText: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.meta,
+  taskText: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    lineHeight: 42,
     fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  heroBlock: {
-    gap: theme.spacing.sm,
-  },
-  kicker: {
-    color: theme.colors.accent,
-    fontSize: theme.typography.meta,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-  },
-  title: {
-    color: theme.colors.text,
-    fontSize: theme.typography.display,
-    lineHeight: 46,
-    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
     letterSpacing: -1.1,
   },
-  action: {
-    color: theme.colors.textMuted,
-    fontSize: 17,
-    lineHeight: 26,
-  },
-  commitFrame: {
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(212,162,76,0.28)',
-    backgroundColor: 'rgba(212,162,76,0.08)',
-    padding: theme.spacing.md,
-    gap: 8,
-    ...theme.shadow.gold,
-  },
-  commitLabel: {
-    color: theme.colors.accent,
-    fontSize: theme.typography.meta,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  commitBody: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
-    lineHeight: 22,
-    fontWeight: '600',
-  },
-  signalCard: {
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.md,
-    gap: theme.spacing.sm,
-  },
-  signalLabel: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.meta,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  signalBody: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
-    lineHeight: 23,
-  },
-  splitRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  miniPanel: {
-    flex: 1,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.md,
-    gap: 8,
-  },
-  miniPanelStrong: {
-    borderColor: 'rgba(212,162,76,0.22)',
-    backgroundColor: 'rgba(212,162,76,0.06)',
-  },
-  panelLabel: {
-    color: theme.colors.textSoft,
-    fontSize: theme.typography.meta,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  panelBody: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
-    lineHeight: 22,
-  },
-  panelBodyStrong: {
-    color: theme.colors.text,
-    fontWeight: '600',
-  },
-  primaryButton: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent,
-    paddingVertical: 19,
-    alignItems: 'center',
-    ...theme.shadow.gold,
-  },
-  primaryButtonText: {
-    color: '#130d04',
-    fontSize: theme.typography.body,
-    fontWeight: '900',
-    letterSpacing: 0.2,
-  },
-  secondaryRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  secondaryButton: {
-    flex: 1,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    paddingVertical: 15,
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceAlt,
-  },
-  secondaryButtonText: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
-    fontWeight: '700',
-  },
-  tertiaryRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  tertiaryButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  tertiaryText: {
-    color: theme.colors.textSoft,
+  reasonText: {
+    color: 'rgba(255,255,255,0.64)',
     fontSize: 15,
-    fontWeight: '700',
+    lineHeight: 20,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  reasonAction: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  cta: {
+    marginTop: 10,
+    width: '100%',
+    minHeight: 60,
+    borderRadius: 20,
+    backgroundColor: '#6C5CE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6C5CE7',
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  ctaText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '800',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.5,
   },
 });

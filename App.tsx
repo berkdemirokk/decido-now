@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AnimatedAuraBackground } from './src/components/AnimatedAuraBackground';
 import { AppTabBar } from './src/components/AppTabBar';
+import { RecoveryOverlay } from './src/components/RecoveryOverlay';
 import { RewardOverlay } from './src/components/RewardOverlay';
 import { ShareCard } from './src/components/ShareCard';
 import { useDecidoApp } from './src/hooks/useDecidoApp';
@@ -15,13 +18,17 @@ import { TodayScreen } from './src/screens/TodayScreen';
 import { GuidanceSheet } from './src/screens/GuidanceSheet';
 import { FocusRunScreen } from './src/screens/FocusRunScreen';
 import { ProgressScreen } from './src/screens/ProgressScreen';
-import { SystemsScreen } from './src/screens/SystemsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
 
 export default function App() {
   const app = useDecidoApp();
   const shellOpacity = useSharedValue(1);
+  const [fontsLoaded] = useFonts({
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
   const shareHeadline = app.copy.helpers.shareHeadline(app.shareVariant);
   const shareResult = app.copy.helpers.shareResult(app.shareVariant);
@@ -38,7 +45,16 @@ export default function App() {
     transform: [{ scale: 0.985 + shellOpacity.value * 0.015 }],
   }));
 
-  if (!app.loaded) {
+  const recoveryVisible =
+    app.tab === 'today' &&
+    Boolean(app.recoveryPrompt) &&
+    !app.focusRunView.visible &&
+    !app.guidanceVisible &&
+    !app.paywallVisible &&
+    !app.reward &&
+    !app.shareRecord;
+
+  if (!app.loaded || !fontsLoaded) {
     return (
       <SafeAreaView style={styles.loading}>
         <StatusBar style="light" />
@@ -54,22 +70,22 @@ export default function App() {
         <LinearGradient colors={['#090b11', '#04060a']} style={styles.gradient}>
           <OnboardingScreen
             copy={app.copy}
+            language={app.appData.language}
             step={app.onboardingStep}
-            selectedGoal={app.onboardingGoal}
+            selectedDirection={app.onboardingDirection}
             selectedFriction={app.onboardingFriction}
             selectedMinutes={app.onboardingMinutes}
             selectedEnergy={app.onboardingEnergy}
-            previewTitle={app.selectedMove?.title}
-            onGoal={app.setOnboardingGoal}
+            previewTitle={app.onboardingPreviewTitle}
+            onDirection={app.setOnboardingDirection}
             onFriction={app.setOnboardingFriction}
             onMinutes={app.setOnboardingMinutes}
             onEnergy={app.setOnboardingEnergy}
             onContinue={() => {
               app.trackCtaTap('onboarding', 'continue', { step: app.onboardingStep });
-              if (app.onboardingStep === 0 && !app.onboardingGoal) return;
+              if (app.onboardingStep === 0 && !app.onboardingDirection) return;
               if (app.onboardingStep === 1 && !app.onboardingFriction) return;
-              if (app.onboardingStep === 2 && !app.onboardingMinutes) return;
-              if (app.onboardingStep === 3 && !app.onboardingEnergy) return;
+              if (app.onboardingStep === 2 && !app.onboardingEnergy) return;
               app.setOnboardingStep((current) => Math.min(current + 1, 4));
             }}
             onStart={() => {
@@ -97,27 +113,18 @@ export default function App() {
                 <AnimatedAuraBackground systemId={app.appData.currentSystem} />
                 <TodayScreen
                   copy={app.copy}
+                  language={app.appData.language}
                   move={app.selectedMove}
-                  contextLabel={app.contextWindowLabel}
-                  personaTitle={app.personaTitle}
-                  personaAuditLine={app.personaAuditLine}
+                  activeDirection={app.activeDirection}
+                  directionOptions={app.directionOptions}
+                  weeklyBlueprint={app.weeklyBlueprint}
                   phaseLabel={app.phaseLabel}
                   movesLeftLabel={app.movesLeftLabel}
                   swapsLeftLabel={app.swapsLeftLabel}
-                  premiumTease={app.premiumTease}
+                  streakLabel={`${app.streak} ${app.copy.states.streak}`}
                   reason={app.guidance?.whyFits ?? ''}
                   todayGain={app.todayGain}
                   tomorrowGain={app.tomorrowGain}
-                  tonightLine={app.tonightLine}
-                  streakLabel={`${app.streak} ${app.copy.states.streak}`}
-                  levelLabel={`${app.rewardProfile.level}`}
-                  executionScore={app.behaviorProfile.executionScore}
-                  stabilityScore={app.behaviorProfile.stabilityScore}
-                  driftScore={app.behaviorProfile.driftScore}
-                  momentumTitle={app.behaviorProfile.momentumTitle}
-                  momentumBody={app.behaviorProfile.momentumBody}
-                  lossLine={app.behaviorProfile.lossLine}
-                  returnPull={app.behaviorProfile.returnPull}
                   recoveryPrompt={app.recoveryPrompt}
                   onStart={() => {
                     app.trackCtaTap('today', 'start_now', { system: app.appData.currentSystem });
@@ -131,14 +138,6 @@ export default function App() {
                     app.trackCtaTap('today', 'try_another', { system: app.appData.currentSystem });
                     app.swapMove();
                   }}
-                  onRefine={() => {
-                    app.trackCtaTap('today', 'tune_system');
-                    app.setTab('systems');
-                  }}
-                  onShare={() => {
-                    app.trackCtaTap('today', 'share_move');
-                    app.openShare();
-                  }}
                   onRecovery={() => {
                     app.trackCtaTap('today', 'recovery_move', { source: app.recoveryPrompt?.source ?? 'abandon' });
                     app.startRecoveryMove(app.recoveryPrompt?.source ?? 'abandon');
@@ -149,26 +148,28 @@ export default function App() {
                     app.trackCtaTap('today', 'streak_saver');
                     app.startStreakSaverReset();
                   }}
+                  onSelectDirection={(directionId) => {
+                    app.trackCtaTap('today', 'switch_direction', { direction: directionId });
+                    app.selectDirection(directionId);
+                  }}
+                  onToggleLanguage={() => {
+                    app.trackCtaTap('today', 'toggle_language');
+                    app.toggleLanguage();
+                  }}
                 />
               </View>
-            ) : null}
-
-            {app.tab === 'systems' ? (
-              <SystemsScreen
-                copy={app.copy}
-                cards={app.trackCards}
-                activeSystem={app.appData.currentSystem}
-                onSelect={app.selectSystem}
-              />
             ) : null}
 
             {app.tab === 'progress' ? (
               <ProgressScreen
                 copy={app.copy}
+                language={app.appData.language}
                 streak={app.streak}
                 level={app.rewardProfile.level}
                 xp={app.rewardProfile.xp}
                 momentumLine={app.rewardProfile.momentumLine}
+                directionLabel={app.activeDirection.label}
+                weeklyBlueprint={app.weeklyBlueprint}
                 weeklySummaryTitle={app.weeklySummary.title}
                 weeklySummaryBody={app.weeklySummary.body}
                 dnaCards={app.dnaCards}
@@ -188,10 +189,8 @@ export default function App() {
                 copy={app.copy}
                 language={app.appData.language}
                 plan={app.appData.subscription.plan}
-                currentSystem={app.appData.currentSystem}
-                currentMoveTitle={app.currentMoveTitle}
                 onOpenPaywall={() => app.openPaywall('soft-success', 'settings-upgrade')}
-                onRestore={app.restoreMockPurchase}
+                onRestore={app.restorePurchases}
                 onManage={app.manageSubscription}
                 onLanguage={app.toggleLanguage}
                 onGiftMove={() => app.openShare()}
@@ -204,7 +203,6 @@ export default function App() {
               current={app.tab}
               items={[
                 { key: 'today', label: app.copy.tabs.today },
-                { key: 'systems', label: app.copy.tabs.systems },
                 { key: 'progress', label: app.copy.tabs.progress },
                 { key: 'settings', label: app.copy.tabs.settings },
               ]}
@@ -217,6 +215,7 @@ export default function App() {
       <GuidanceSheet
         visible={app.guidanceVisible}
         copy={app.copy}
+        language={app.appData.language}
         title={app.selectedMove?.title ?? app.copy.guidance.title}
         guidance={app.guidance}
         projection={app.projection}
@@ -239,6 +238,7 @@ export default function App() {
 
       <FocusRunScreen
         copy={app.copy}
+        language={app.appData.language}
         state={app.focusRunView}
         onStart={() => {
           app.trackCtaTap('focus_run', 'lock_it_in');
@@ -281,30 +281,46 @@ export default function App() {
         onContinue={app.closeReward}
       />
 
+      {app.recoveryPrompt ? (
+        <RecoveryOverlay
+          visible={recoveryVisible}
+          language={app.appData.language}
+          source={app.recoveryPrompt.source ?? 'abandon'}
+          ctaLabel={app.recoveryPrompt.cta}
+          onRecover={() => {
+            app.trackCtaTap('today', 'recovery_move', { source: app.recoveryPrompt?.source ?? 'abandon' });
+            app.startRecoveryMove(app.recoveryPrompt?.source ?? 'abandon');
+          }}
+        />
+      ) : null}
+
       <PaywallScreen
         visible={app.paywallVisible}
         copy={app.copy}
+        language={app.appData.language}
         mode={app.paywallMode}
         body={app.paywallBody}
         prices={app.paywallPriceLabels}
         storeConnected={app.storeConnected}
         storeCatalogLoaded={app.storeCatalogLoaded}
+        storeBusy={app.storeBusy}
         storeError={app.storeError}
+        storeStatusLine={app.storeStatusLine}
         onAnnual={() => {
           app.trackCtaTap('paywall', 'start_yearly_trial', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });
-          app.mockPurchase('pro-yearly');
+          app.purchasePlan('pro-yearly');
         }}
         onMonthly={() => {
           app.trackCtaTap('paywall', 'choose_monthly', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });
-          app.mockPurchase('pro-monthly');
+          app.purchasePlan('pro-monthly');
         }}
         onFounding={() => {
           app.trackCtaTap('paywall', 'choose_founding', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });
-          app.mockPurchase('founding');
+          app.purchasePlan('founding');
         }}
         onRestore={() => {
           app.trackCtaTap('paywall', 'restore');
-          app.restoreMockPurchase();
+          app.restorePurchases();
         }}
         onClose={() => {
           app.trackCtaTap('paywall', 'continue_free', { source: app.paywallSource ?? 'unknown', mode: app.paywallMode });

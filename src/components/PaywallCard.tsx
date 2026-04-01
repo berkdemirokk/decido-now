@@ -24,64 +24,81 @@ export function PaywallCard({
       onPress={onPress}
       style={[
         styles.card,
-        featured && {
-          borderColor: theme.colors.accent,
-          backgroundColor: theme.colors.surfaceAlt,
-        },
+        featured ? styles.cardFeatured : null,
       ]}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.copy}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subline}>{subline}</Text>
+        </View>
         {badge ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
         ) : null}
       </View>
+
       <Text style={styles.price}>{price}</Text>
-      <Text style={styles.subline}>{subline}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: theme.radius.lg,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    backgroundColor: 'rgba(255,255,255,0.03)',
     padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  cardFeatured: {
+    borderColor: theme.colors.borderGold,
+    backgroundColor: 'rgba(214,169,79,0.08)',
+    shadowColor: theme.colors.accent,
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 7,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+  },
+  copy: {
+    flex: 1,
+    gap: 6,
   },
   title: {
     color: theme.colors.text,
     fontSize: theme.typography.h2,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   badge: {
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.accentSoft,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
   badgeText: {
     color: theme.colors.accent,
     fontSize: theme.typography.meta,
-    fontWeight: '700',
-    letterSpacing: 0.8,
+    fontWeight: '900',
+    letterSpacing: 0.9,
   },
   price: {
     color: theme.colors.text,
-    fontSize: theme.typography.h1,
-    fontWeight: '800',
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '900',
+    letterSpacing: -1.1,
   },
   subline: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
+    lineHeight: 22,
   },
 });

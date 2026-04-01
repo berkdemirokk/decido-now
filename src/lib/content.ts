@@ -1,5 +1,5 @@
-import { DAILY_SPARKS } from '../data/suggestions';
 import { Suggestion, SupportedLanguage } from '../types';
+import { TR_DAILY_SPARKS, TR_SUGGESTION_COPY } from './turkishSuggestionCopy';
 
 const EN_SUGGESTION_COPY: Record<string, { title: string; action: string; reason: string }> = {
   'focus-01': {
@@ -406,7 +406,21 @@ const EN_SPARKS = [
 
 export function localizeSuggestion(suggestion: Suggestion, language: SupportedLanguage) {
   if (language === 'tr') {
-    return suggestion;
+    const translated = TR_SUGGESTION_COPY[suggestion.id];
+    if (!translated) {
+      return {
+        ...suggestion,
+        title: addBrandPrefix(suggestion.category, suggestion.title),
+        reason: buildTurkishReason(suggestion),
+      };
+    }
+
+    return {
+      ...suggestion,
+      title: addBrandPrefix(suggestion.category, translated.coreTitle),
+      action: translated.action,
+      reason: translated.reason ?? buildTurkishReason(suggestion),
+    };
   }
 
   const translated = EN_SUGGESTION_COPY[suggestion.id];
@@ -425,8 +439,40 @@ export function localizeSuggestion(suggestion: Suggestion, language: SupportedLa
 
 export function getLocalizedSpark(language: SupportedLanguage) {
   if (language === 'tr') {
-    return DAILY_SPARKS[new Date().getDate() % DAILY_SPARKS.length];
+    return TR_DAILY_SPARKS[new Date().getDate() % TR_DAILY_SPARKS.length];
   }
 
   return EN_SPARKS[new Date().getDate() % EN_SPARKS.length];
+}
+
+function addBrandPrefix(category: Suggestion['category'], title: string) {
+  const prefixMap: Record<Suggestion['category'], string> = {
+    focus: 'Momentum Sprinti',
+    health: 'Prime Reset',
+    money: 'Para Blueprint’i',
+    social: 'Bağ Hamlesi',
+    reset: 'Reset Protokolü',
+    growth: 'Gelişim Blueprint’i',
+    learn: 'Öğrenme Sprinti',
+    language: 'Dil Prime’ı',
+    earn: 'Execution Çıkışı',
+  };
+
+  return `${prefixMap[category]} · ${title}`;
+}
+
+function buildTurkishReason(suggestion: Suggestion) {
+  const byCategory: Record<Suggestion['category'], string> = {
+    focus: 'Çünkü bugün ihtiyacın olan şey daha fazla seçenek değil; görünür bir ileri hamle.',
+    health: 'Çünkü beden prime olduğunda karar kalitesi de hızla yükselir.',
+    money: 'Çünkü para tarafında netlik, baskıyı düşünmekten daha hızlı rahatlatır.',
+    social: 'Çünkü bağ kurmada en pahalı şey kusursuzluk değil; gecikmedir.',
+    reset: 'Çünkü küçük resetler zihni yeniden harekete hazırlar.',
+    growth: 'Çünkü ilerleme, büyük niyetlerden değil tekrar eden temiz kapanışlardan büyür.',
+    learn: 'Çünkü bilgi, çıktıya dönüştüğünde kalıcı olur.',
+    language: 'Çünkü dil izleyerek değil, kullanarak açılır.',
+    earn: 'Çünkü gelir tarafında asıl eşik kalite değil; ilk çıkıştır.',
+  };
+
+  return byCategory[suggestion.category];
 }

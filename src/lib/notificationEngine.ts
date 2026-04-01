@@ -79,8 +79,8 @@ export function buildRecallNotification(
     return {
       type: 'recall',
       moveId,
-      title: 'Hamle hala canli',
-      body: `"${moveTitle}" sende ne degistirdi? Sicakken skorla.`,
+      title: 'Hamle hâlâ sıcak',
+      body: `"${moveTitle}" sende ne açtı? Gir ve skoru temiz kapat.`,
       date,
     };
   }
@@ -88,8 +88,8 @@ export function buildRecallNotification(
   return {
     type: 'recall',
     moveId,
-    title: 'The move is still live',
-    body: `What changed after "${moveTitle}"? Lock the score while it is fresh.`,
+    title: 'The move is still warm',
+    body: `What did "${moveTitle}" unlock today? Jump back in and close the score cleanly.`,
     date,
   };
 }
@@ -104,8 +104,8 @@ export function buildStreakSaverNotification(
     return {
       type: 'streak-saver',
       dateKey,
-      title: 'Bugunu dusurme',
-      body: '2 dakikalik reset ile bugunun momentumunu hala koruyabilirsin.',
+      title: 'Bugünü kaybetme',
+      body: '2 dakikalık reset ile ritmi bugün içinde geri alabilirsin.',
       date,
     };
   }
@@ -114,7 +114,7 @@ export function buildStreakSaverNotification(
     type: 'streak-saver',
     dateKey,
     title: 'Do not lose today',
-    body: 'A 2-minute reset can still protect today\'s momentum.',
+    body: 'A 2-minute reset can still protect the day.',
     date,
   };
 }
@@ -129,8 +129,8 @@ export function buildRecoveryNotification(
     return {
       type: 'recovery',
       dateKey,
-      title: 'Momentum catladi. Don.',
-      body: '2 dakikalik recovery hamlesi ile tekrar harekete gir.',
+      title: 'Momentum çatladı',
+      body: '2 dakikalık kurtarma hamlesiyle tekrar harekete gir.',
       date,
     };
   }
@@ -138,8 +138,8 @@ export function buildRecoveryNotification(
   return {
     type: 'recovery',
     dateKey,
-    title: 'Momentum cracked. Reset now.',
-    body: 'Take the 2-minute recovery move and get back into motion.',
+    title: 'Momentum cracked',
+    body: 'Take the 2-minute recovery move and get back in motion.',
     date,
   };
 }
@@ -180,9 +180,7 @@ async function cancelMatchingNotifications(payload: LocalNotificationPayload) {
     return data.dateKey === payload.dateKey;
   });
 
-  await Promise.all(
-    matches.map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier))
-  );
+  await Promise.all(matches.map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier)));
 }
 
 function getTonightSaverTime() {

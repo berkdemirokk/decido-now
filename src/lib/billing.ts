@@ -39,9 +39,9 @@ export function getProductIdFromPlan(plan: Exclude<PlanTier, 'free'>) {
 }
 
 export function getSubscriptionLabel(plan: Exclude<PlanTier, 'free'>) {
-  if (plan === 'pro-yearly') return 'Decido Pro Yearly';
-  if (plan === 'founding') return 'Decido Founding Member';
-  return 'Decido Pro Monthly';
+  if (plan === 'pro-yearly') return 'Decido Now Pro Yearly';
+  if (plan === 'founding') return 'Decido Now Founding Member';
+  return 'Decido Now Pro Monthly';
 }
 
 export function getPrimarySubscriptionOfferToken(

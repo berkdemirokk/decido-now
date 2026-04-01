@@ -15,6 +15,15 @@ import {
   buildRecoveryMove,
 } from '../lib/contextEngine';
 import { getTodayKey, pickSuggestions } from '../lib/decisionEngine';
+import {
+  buildDirectionContext,
+  buildDirectionModel,
+  getDirectionCategories,
+  getDirectionDefinition,
+  inferDirectionFromSystem,
+  mapDirectionToSystem,
+  prioritizeSuggestionsForDirection,
+} from '../lib/directionEngine';
 import { updateDecisionDnaScores } from '../lib/dnaScoring';
 import {
   getDateKeyOffset,
@@ -36,7 +45,6 @@ import { buildProgressSummary } from '../lib/progressInsights';
 import { buildGiftMovePayload, canSendGift, parseGiftMoveLink } from '../lib/referralEngine';
 import { buildRewardProfile, buildRewardResult } from '../lib/rewardSystem';
 import { createDefaultAppData, loadAppData, saveAppData } from '../lib/storage';
-import { buildTrackCards } from '../lib/trackEngine';
 import { getUiCopy } from '../lib/uiCopy';
 import {
   AppData,
@@ -47,12 +55,23 @@ import {
   Energy,
   Friction,
   Goal,
+  GrowthDirectionId,
   PaywallMode,
   PlanTier,
   Suggestion,
   SystemId,
 } from '../types';
 import { useStoreBilling } from './useStoreBilling';
+import {
+  buildSharePersonaLabel,
+  buildSimpleDnaCards,
+  buildSimpleWeeklySummary,
+  buildTonightLine,
+  createEmptyFocusRun,
+  FocusRunState,
+  PaywallState,
+  RecoveryPrompt,
+} from './useDecidoApp.helpers';
 
 const DEFAULT_CONTEXT: DecisionContext = {
   goal: 'finish',
@@ -63,50 +82,6 @@ const DEFAULT_CONTEXT: DecisionContext = {
   budget: 'free',
   category: 'focus',
 };
-
-interface FocusRunState {
-  visible: boolean;
-  move: Suggestion | null;
-  steps: string[];
-  totalSeconds: number;
-  secondsLeft: number;
-  currentStep: number;
-  phase: 'prestart' | 'active' | 'halfway' | 'nearFinish' | 'score' | 'leaveConfirm';
-  easyMode: boolean;
-  usedGuidance: boolean;
-  committedAt: string | null;
-  isRecovery: boolean;
-}
-
-interface PaywallState {
-  visible: boolean;
-  mode: PaywallMode;
-  source: string | null;
-}
-
-interface RecoveryPrompt {
-  title: string;
-  body: string;
-  cta: string;
-  source: 'abandon' | 'missed-day' | 'swap-fatigue';
-  premiumProtected: boolean;
-}
-
-function createEmptyFocusRun(): FocusRunState {
-  return {
-    visible: false,
-    move: null,
-    steps: [],
-    totalSeconds: 0,
-    secondsLeft: 0,
-    currentStep: 0,
-    phase: 'prestart',
-    easyMode: false,
-    usedGuidance: false,
-    committedAt: null,
-    isRecovery: false,
-  };
-}
 
 export function useDecidoApp() {
   const billing = useStoreBilling();
@@ -138,7 +113,7 @@ export function useDecidoApp() {
   } | null>(null);
   const [pendingSoftPaywall, setPendingSoftPaywall] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
-  const [onboardingGoal, setOnboardingGoal] = useState<Goal | null>(null);
+  const [onboardingDirection, setOnboardingDirection] = useState<GrowthDirectionId | null>(null);
   const [onboardingFriction, setOnboardingFriction] = useState<Friction | null>(null);
   const [onboardingMinutes, setOnboardingMinutes] = useState<number | null>(null);
   const [onboardingEnergy, setOnboardingEnergy] = useState<Energy | null>(null);
@@ -277,36 +252,61 @@ export function useDecidoApp() {
     [appData.decisions]
   );
 
-  const trackCards = useMemo(
-    () => buildTrackCards(appData.decisions, appData.language),
-    [appData.decisions, appData.language]
+  const currentDirection = appData.currentDirection ?? inferDirectionFromSystem(appData.currentSystem);
+  const directionModel = useMemo(
+    () => buildDirectionModel(currentDirection, appData.decisions, appData.language),
+    [appData.decisions, appData.language, currentDirection]
   );
-  const activeTrack = trackCards.find((card) => card.id === appData.currentSystem) ?? trackCards[0];
+  const directionOptions = directionModel.options;
+  const activeDirection = directionModel.active;
 
   useEffect(() => {
-    if (!activeTrack) return;
     setContext((current) => ({
       ...current,
-      ...activeTrack.context,
-      goal: current.goal,
+      ...directionModel.context,
+      budget: current.budget,
       friction: current.friction,
       minutes: current.minutes,
       energy: current.energy,
     }));
-  }, [activeTrack?.id]);
+  }, [directionModel.context.category, directionModel.context.goal, directionModel.context.mode]);
+
+  useEffect(() => {
+    const mappedSystem = mapDirectionToSystem(currentDirection);
+    if (appData.currentSystem === mappedSystem) return;
+    setAppData((current) => ({
+      ...current,
+      currentSystem: mappedSystem,
+    }));
+  }, [appData.currentSystem, currentDirection]);
 
   const contextAwareResult = useMemo(() => {
     const localized = pickSuggestions(context, appData.decisions).map((suggestion) =>
       localizeSuggestion(suggestion, appData.language)
     );
-    return applyContextAwareSuggestions(localized, context, appData.language);
-  }, [appData.decisions, appData.language, context]);
+    const prioritized = prioritizeSuggestionsForDirection(localized, currentDirection, appData.decisions);
+    return applyContextAwareSuggestions(prioritized, context, appData.language);
+  }, [appData.decisions, appData.language, context, currentDirection]);
 
   const suggestions = contextAwareResult.suggestions;
   const selectedMove =
     suggestions.find((suggestion) => suggestion.id === selectedMoveId) ?? suggestions[0] ?? null;
   const activeMove = forcedMove ?? selectedMove;
   const alternatives = suggestions.filter((suggestion) => suggestion.id !== activeMove?.id);
+  const onboardingDirectionId = onboardingDirection ?? currentDirection;
+  const onboardingPreviewContext = useMemo<DecisionContext>(() => {
+    const base = buildDirectionContext(onboardingDirectionId);
+    return {
+      ...base,
+      friction: onboardingFriction ?? base.friction,
+      minutes: onboardingMinutes ?? base.minutes,
+      energy: onboardingEnergy ?? base.energy,
+    };
+  }, [onboardingDirectionId, onboardingFriction, onboardingMinutes, onboardingEnergy]);
+  const onboardingPreviewMove = useMemo(() => {
+    const preview = pickSuggestions(onboardingPreviewContext, appData.decisions)[0];
+    return preview ? localizeSuggestion(preview, appData.language) : null;
+  }, [appData.decisions, appData.language, onboardingPreviewContext]);
 
   useEffect(() => {
     if (!selectedMove && suggestions[0] && !forcedMove) {
@@ -756,18 +756,20 @@ export function useDecidoApp() {
   }
 
   function completeOnboarding(startAfter = false, openWhy = false) {
+    const selectedDirection = onboardingDirection ?? currentDirection;
+    const directionContext = buildDirectionContext(selectedDirection);
     const nextContext: DecisionContext = {
-      ...context,
-      goal: onboardingGoal ?? context.goal,
-      friction: onboardingFriction ?? context.friction,
-      minutes: onboardingMinutes ?? context.minutes,
-      energy: onboardingEnergy ?? context.energy,
+      ...directionContext,
+      friction: onboardingFriction ?? directionContext.friction,
+      minutes: onboardingMinutes ?? directionContext.minutes,
+      energy: onboardingEnergy ?? directionContext.energy,
+      budget: context.budget,
     };
     const persona = assignPersonaFromAudit(
-      onboardingGoal ?? context.goal,
-      onboardingFriction ?? context.friction,
-      onboardingEnergy ?? context.energy,
-      onboardingMinutes ?? context.minutes,
+      nextContext.goal,
+      nextContext.friction,
+      nextContext.energy,
+      nextContext.minutes,
       appData.language
     );
     const now = new Date().toISOString();
@@ -778,8 +780,12 @@ export function useDecidoApp() {
       onboardingDone: true,
       onboardingCompletedAt: current.onboardingCompletedAt ?? now,
       firstActivatedAt: current.firstActivatedAt ?? now,
+      currentDirection: selectedDirection,
+      currentDirectionChosenAt: current.currentDirectionChosenAt ?? now,
+      currentSystem: mapDirectionToSystem(selectedDirection),
       persona: persona.id,
       analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.onboardingComplete, {
+        direction: selectedDirection,
         goal: nextContext.goal,
         friction: nextContext.friction,
         minutes: nextContext.minutes,
@@ -964,11 +970,16 @@ export function useDecidoApp() {
     setFocusRun(createEmptyFocusRun());
     setReward(rewardResult);
     setShareRecord(record);
-    setTab('progress');
+    setTab('today');
     setConsecutiveSwaps(0);
     setForcedMove(null);
 
-    if (!entitlements.isPremium && !entitlements.isActivationPhase && doneCount >= 1 && !appData.usage.softPaywallSeenAt) {
+    if (
+      !entitlements.isPremium &&
+      !entitlements.isActivationPhase &&
+      doneCount >= 2 &&
+      !appData.usage.softPaywallSeenAt
+    ) {
       setPendingSoftPaywall(true);
     }
 
@@ -1147,18 +1158,25 @@ export function useDecidoApp() {
     }));
   }
 
-  function selectSystem(systemId: SystemId) {
-    const track = trackCards.find((card) => card.id === systemId);
-    if (!track) return;
+  function selectDirection(directionId: GrowthDirectionId) {
+    const direction = buildDirectionModel(directionId, appData.decisions, appData.language);
+    const now = new Date().toISOString();
 
     setAppData((current) => ({
       ...current,
-      currentSystem: systemId,
+      currentDirection: directionId,
+      currentDirectionChosenAt: now,
+      currentSystem: mapDirectionToSystem(directionId),
       analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.systemSelected, {
-        system: systemId,
+        system: mapDirectionToSystem(directionId),
+        direction: directionId,
       }),
     }));
-    setContext(track.context);
+    setContext((current) => ({
+      ...current,
+      ...direction.context,
+      budget: current.budget,
+    }));
     setForcedMove(null);
     setSelectedMoveId(null);
     setConsecutiveSwaps(0);
@@ -1275,7 +1293,11 @@ export function useDecidoApp() {
     }));
   }
 
-  async function mockPurchase(plan: Exclude<PlanTier, 'free'>) {
+  async function purchasePlan(plan: Exclude<PlanTier, 'free'>) {
+    if (billing.purchasePending || billing.restorePending) {
+      return;
+    }
+
     setAppData((current) => ({
       ...current,
       analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.purchaseStarted, {
@@ -1284,91 +1306,37 @@ export function useDecidoApp() {
       }),
     }));
 
-    if (billing.hasLiveStore) {
-      try {
-        await billing.purchasePlan(plan);
-        return;
-      } catch (error) {
-        Alert.alert(
-          appData.language === 'tr' ? 'Magaza kullanilamiyor' : 'Store unavailable',
-          error instanceof Error
-            ? error.message
-            : appData.language === 'tr'
-              ? 'Satin alim baslatilamadi.'
-              : 'Purchase could not start.'
-        );
-        return;
-      }
-    }
-
-    if (Platform.OS !== 'web') {
+    try {
+      await billing.purchasePlan(plan);
+    } catch (error) {
       Alert.alert(
-        appData.language === 'tr' ? 'Magaza baglaniyor' : 'Store connecting',
-        appData.language === 'tr'
-          ? 'Native store katalogu henuz hazir degil. Biraz bekleyip tekrar dene.'
-          : 'The native store catalog is not ready yet. Please wait a moment and try again.'
+        appData.language === 'tr' ? 'Magaza kullanilamiyor' : 'Store unavailable',
+        error instanceof Error
+          ? error.message
+          : appData.language === 'tr'
+            ? 'Satin alim baslatilamadi.'
+            : 'Purchase could not start.'
       );
-      return;
     }
-
-    setAppData((current) => ({
-      ...current,
-      devPlanPreview: plan,
-      subscription: {
-        plan,
-        productId:
-          plan === 'pro-yearly'
-            ? 'decido.pro.yearly'
-            : plan === 'founding'
-              ? 'decido.pro.founding'
-              : 'decido.pro.monthly',
-        status: 'active',
-        source: 'manual',
-        lastSyncedAt: new Date().toISOString(),
-      },
-      analytics: trackAnalyticsEvent(current.analytics, ANALYTICS_EVENTS.purchaseCompleted, {
-        plan,
-        source: 'manual',
-      }),
-      streakFreeze: {
-        ...current.streakFreeze,
-        credits: plan === 'founding' ? 3 : Math.max(current.streakFreeze.credits, 1),
-      },
-    }));
-    closePaywall();
-    setPendingSoftPaywall(false);
   }
 
-  async function restoreMockPurchase() {
-    if (billing.hasLiveStore) {
-      try {
-        await billing.restore();
-        return;
-      } catch (error) {
-        Alert.alert(
-          appData.language === 'tr' ? 'Geri yukleme basarisiz' : 'Restore failed',
-          error instanceof Error
-            ? error.message
-            : appData.language === 'tr'
-              ? 'Satin alimlar geri yuklenemedi.'
-              : 'Could not restore purchases.'
-        );
-        return;
-      }
-    }
-
-    if (Platform.OS !== 'web') {
-      Alert.alert(
-        appData.language === 'tr' ? 'Geri yukleme hazir degil' : 'Restore unavailable',
-        appData.language === 'tr'
-          ? 'Native store henuz hazir degil. Biraz sonra tekrar dene.'
-          : 'The native store is not ready yet. Please try restore again in a moment.'
-      );
+  async function restorePurchases() {
+    if (billing.purchasePending || billing.restorePending) {
       return;
     }
 
-    const plan = appData.devPlanPreview === 'free' ? 'pro-yearly' : appData.devPlanPreview;
-    await mockPurchase(plan as Exclude<PlanTier, 'free'>);
+    try {
+      await billing.restore();
+    } catch (error) {
+      Alert.alert(
+        appData.language === 'tr' ? 'Geri yukleme basarisiz' : 'Restore failed',
+        error instanceof Error
+          ? error.message
+          : appData.language === 'tr'
+            ? 'Satin alimlar geri yuklenemedi.'
+            : 'Could not restore purchases.'
+      );
+    }
   }
 
   async function manageSubscription() {
@@ -1412,7 +1380,7 @@ export function useDecidoApp() {
   function toggleLanguage() {
     setAppData((current) => ({
       ...current,
-      language: current.language === 'tr' ? 'en' : 'tr',
+      language: current.language === 'en' ? 'tr' : 'en',
     }));
   }
 
@@ -1439,6 +1407,25 @@ export function useDecidoApp() {
     plan: appData.subscription.plan,
     isActivationPhase: entitlements.isActivationPhase,
   });
+  const storeStatusLine = billing.purchasePending
+    ? appData.language === 'tr'
+      ? 'Satin alim isleniyor...'
+      : 'Processing purchase...'
+    : billing.restorePending
+      ? appData.language === 'tr'
+        ? 'Satin alimlar geri yukleniyor...'
+        : 'Restoring purchases...'
+      : billing.hasLiveStore
+        ? billing.catalogLoaded
+          ? null
+          : appData.language === 'tr'
+            ? 'Magaza baglaniyor...'
+            : 'Connecting to the store...'
+        : Platform.OS !== 'web'
+          ? appData.language === 'tr'
+            ? 'Magaza henuz hazir degil.'
+            : 'Store is not ready yet.'
+          : null;
 
   return {
     loaded,
@@ -1476,7 +1463,9 @@ export function useDecidoApp() {
     shareRecord,
     shareVariant,
     setShareRecord,
-    trackCards,
+    directionOptions,
+    activeDirection,
+    weeklyBlueprint: directionModel.weeklyBlueprint,
     dnaCards,
     dnaLockedCount: dnaCards.filter((card) => card.metric === copy.states.locked).length,
     weeklySummary,
@@ -1495,8 +1484,8 @@ export function useDecidoApp() {
     consecutiveSwaps,
     onboardingStep,
     setOnboardingStep,
-    onboardingGoal,
-    setOnboardingGoal,
+    onboardingDirection,
+    setOnboardingDirection,
     onboardingFriction,
     setOnboardingFriction,
     onboardingMinutes,
@@ -1514,12 +1503,12 @@ export function useDecidoApp() {
     swapMove,
     startStreakSaverReset,
     startRecoveryMove,
-    selectSystem,
+    selectDirection,
     performShare,
     openShare,
     trackCtaTap,
-    mockPurchase,
-    restoreMockPurchase,
+    purchasePlan,
+    restorePurchases,
     manageSubscription,
     toggleLanguage,
     closeReward,
@@ -1529,12 +1518,15 @@ export function useDecidoApp() {
     personaTitle: personaProfile?.title ?? null,
     personaAuditLine: personaProfile?.auditLine ?? null,
     currentMoveTitle: activeMove?.title ?? copy.today.noMove,
+    onboardingPreviewTitle: onboardingPreviewMove?.title ?? null,
     shareGiftPreview,
-    sharePersonaLabel: buildSharePersonaLabel(appData.currentSystem, streak, appData.language),
+    sharePersonaLabel: buildSharePersonaLabel(currentDirection, streak, appData.language),
     paywallPriceLabels: billing.priceLabels,
     storeConnected: billing.hasLiveStore,
     storeCatalogLoaded: billing.catalogLoaded,
+    storeBusy: billing.purchasePending || billing.restorePending,
     storeError: billing.storeError,
+    storeStatusLine,
     phaseLabel,
     movesLeftLabel,
     swapsLeftLabel,
@@ -1542,155 +1534,6 @@ export function useDecidoApp() {
     recoveryPrompt,
     openPaywall: showPaywall,
   };
-}
-
-function buildSimpleDnaCards(
-  decisions: DecisionRecord[],
-  dnaScores: AppData['dnaScores'],
-  language: AppData['language'],
-  premiumInsights: boolean
-) {
-  const reviewed = decisions.filter((decision) => decision.reviewedAt);
-  if (!reviewed.length) return [];
-
-  const morningDone = reviewed.filter(
-    (decision) =>
-      new Date(decision.createdAt).getHours() < 12 && decision.completion === 'done'
-  ).length;
-  const shortDone = reviewed.filter(
-    (decision) => decision.selectedSuggestion.minutes <= 10 && decision.completion === 'done'
-  ).length;
-  const avoidantMoments = reviewed.filter(
-    (decision) => decision.context.friction === 'avoidant'
-  ).length;
-  const lockedMetric = language === 'tr' ? 'Kilitli' : 'Locked';
-
-  return [
-    {
-      id: 'time',
-      eyebrow: language === 'tr' ? 'En iyi pencere' : 'Best window',
-      title: language === 'tr' ? 'Sabah kapanislari daha temiz' : 'Morning closes are cleaner',
-      body:
-        language === 'tr'
-          ? `Simdiye kadar ${morningDone} temiz sabah kapanisi birikti.`
-          : `You already stacked ${morningDone} clean morning closes.`,
-      metric: `${morningDone}`,
-    },
-    {
-      id: 'format',
-      eyebrow: language === 'tr' ? 'En iyi format' : 'Best format',
-      title:
-        language === 'tr'
-          ? 'Kisa hamleler sende daha sert kapaniyor'
-          : 'Short moves are closing harder for you',
-      body:
-        language === 'tr'
-          ? '10 dakikanin altindaki hamleler daha fazla temiz kapanis uretiyor.'
-          : 'Sub-10-minute moves are creating cleaner follow-through.',
-      metric: `${shortDone}`,
-    },
-    {
-      id: 'friction',
-      eyebrow: language === 'tr' ? 'Surtunme' : 'Main friction',
-      title:
-        language === 'tr'
-          ? 'Yuksek direnci olan seyleri gec aciyorsun'
-          : 'You are still opening high-resistance tasks late',
-      body:
-        language === 'tr'
-          ? `Kacinma ${avoidantMoments} kez goruldu. Daha hafif geri girisler kritik.`
-          : `Avoidance showed up ${avoidantMoments} times. Easier re-entry moves matter.`,
-      metric: `${avoidantMoments}`,
-    },
-    {
-      id: 'efficiency',
-      eyebrow: 'DNA',
-      title:
-        language === 'tr'
-          ? 'Verimlilik puani daha derin veride acilir'
-          : 'Efficiency unlocks with deeper pattern data',
-      body:
-        language === 'tr'
-          ? 'Tahminden hizli bitirdigin bloklar verimliligi yukseltiyor.'
-          : 'Finishing faster than the estimate raises your efficiency score.',
-      metric: premiumInsights ? `${dnaScores.efficiency}/100` : lockedMetric,
-    },
-    {
-      id: 'intuition',
-      eyebrow: 'DNA',
-      title:
-        language === 'tr'
-          ? 'Sezgi puani fazla aciklama istemediginde buyuyor'
-          : 'Intuition grows when you stop asking for more explanation',
-      body:
-        language === 'tr'
-          ? 'Neden ekranina girmeden baslamak sezgi guvenini guclendirir.'
-          : 'Starting without opening guidance builds intuitive trust.',
-      metric: premiumInsights ? `${dnaScores.intuition}/100` : lockedMetric,
-    },
-  ];
-}
-
-function buildSimpleWeeklySummary(decisions: DecisionRecord[], language: AppData['language']) {
-  const recent = decisions.filter((decision) => decision.reviewedAt).slice(0, 7);
-  if (!recent.length) {
-    return {
-      title:
-        language === 'tr'
-          ? 'Ritim yeni kuruluyor'
-          : 'Your rhythm is just forming',
-      body:
-        language === 'tr'
-          ? 'Birkac skorlanan hamleden sonra hangi formatin sende daha temiz kapandigi netlesir.'
-          : 'After a few scored moves, the system can tell which format really closes better for you.',
-    };
-  }
-
-  const doneCount = recent.filter((decision) => decision.completion === 'done').length;
-  const avgScore =
-    Math.round(
-      (recent.reduce((sum, decision) => sum + (decision.resultScore ?? 0), 0) / recent.length) *
-        10
-    ) / 10;
-
-  return {
-    title:
-      language === 'tr'
-        ? `Bu hafta ${doneCount}/${recent.length} hamle temiz kapandi`
-        : `${doneCount}/${recent.length} moves closed this week`,
-    body:
-      language === 'tr'
-        ? `Ortalama skorun ${avgScore}/5. Sistem artik sana hangi zorlugun sende calistigini daha net okuyor.`
-        : `Your average score is ${avgScore}/5. The system is reading which level of pressure actually works for you.`,
-  };
-}
-
-function buildTonightLine(language: AppData['language'], pendingCount: number, completionRate: number) {
-  if (pendingCount > 0) {
-    return language === 'tr'
-      ? `${pendingCount} hamle bu aksam skor bekliyor. Asil keskinlesme burada oluyor.`
-      : `${pendingCount} moves are waiting for a score tonight. This is where the system sharpens.`;
-  }
-
-  return language === 'tr'
-    ? `Bugunluk kapanis oranin %${completionRate}. Gece bir skor daha yarinin hamlesini temizler.`
-    : `Your close rate is ${completionRate}% today. One score tonight makes tomorrow cleaner.`;
-}
-
-function buildSharePersonaLabel(systemId: SystemId, streak: number, language: AppData['language']) {
-  if (streak < 7) {
-    return language === 'tr' ? 'Bugunun net hamlesi' : "Today's clean move";
-  }
-
-  const labels = {
-    decide: language === 'tr' ? 'Taktik Mimar' : 'The Tactical Architect',
-    learn: language === 'tr' ? 'Bilgi Mimari' : 'The Pattern Builder',
-    earn: language === 'tr' ? 'Gelir Operatori' : 'The Revenue Operator',
-    move: language === 'tr' ? 'Akis Motoru' : 'The Flow Engine',
-    reset: language === 'tr' ? 'Sakin Operator' : 'The Calm Operator',
-  } satisfies Record<SystemId, string>;
-
-  return labels[systemId];
 }
 
 

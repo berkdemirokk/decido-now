@@ -56,10 +56,11 @@ export function trackAnalyticsEvent(
   metadata?: Record<string, string | number | boolean | null>
 ): AnalyticsState {
   const now = new Date().toISOString();
+  const isAppOpen = name === ANALYTICS_EVENTS.appOpen;
 
   return {
     ...analytics,
-    lastOpenAt: now,
+    lastOpenAt: isAppOpen ? now : analytics.lastOpenAt,
     events: [
       {
         id: `${name}-${Date.now()}`,
@@ -82,6 +83,8 @@ export function markFirstCompletion(analytics: AnalyticsState) {
 
 export function buildAnalyticsSummary(analytics: AnalyticsState) {
   const events = analytics.events;
+  const activeDays = getDistinctDays(events, ANALYTICS_EVENTS.appOpen);
+  const retentionDays = getReturnDaysAfterFirstOpen(analytics);
 
   return {
     sessions: countEvents(events, ANALYTICS_EVENTS.appOpen),
@@ -110,7 +113,8 @@ export function buildAnalyticsSummary(analytics: AnalyticsState) {
     shareVariantOpened: countEvents(events, ANALYTICS_EVENTS.shareVariantOpened),
     shareVariantUsed: countEvents(events, ANALYTICS_EVENTS.shareVariantUsed),
     gifts: countEvents(events, ANALYTICS_EVENTS.giftMoveSent),
-    retentionDays: getDistinctDays(events, ANALYTICS_EVENTS.appOpen),
+    activeDays,
+    retentionDays,
     notificationScheduled: countEvents(events, ANALYTICS_EVENTS.notificationScheduled),
     rewardViews: countEvents(events, ANALYTICS_EVENTS.rewardViewed),
     ctaTaps: countEvents(events, ANALYTICS_EVENTS.ctaTapped),
@@ -127,4 +131,16 @@ function getDistinctDays(events: AnalyticsState['events'], name: string) {
       .filter((event) => event.name === name)
       .map((event) => event.createdAt.slice(0, 10))
   ).size;
+}
+
+function getReturnDaysAfterFirstOpen(analytics: AnalyticsState) {
+  const firstOpenDay = analytics.firstOpenAt.slice(0, 10);
+  const openDays = new Set(
+    analytics.events
+      .filter((event) => event.name === ANALYTICS_EVENTS.appOpen)
+      .map((event) => event.createdAt.slice(0, 10))
+      .filter((day) => day !== firstOpenDay)
+  );
+
+  return openDays.size;
 }

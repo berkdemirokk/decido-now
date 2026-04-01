@@ -1,20 +1,14 @@
 import { useEffect } from 'react';
-import { BlurView } from 'expo-blur';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { PaywallCard } from '../components/PaywallCard';
 import { UiCopy } from '../lib/uiCopy';
-import { theme } from '../theme';
+import { SupportedLanguage } from '../types';
 
 interface PaywallScreenProps {
   visible: boolean;
   copy: UiCopy;
+  language: SupportedLanguage;
   mode: 'soft-success' | 'hard-access';
   body: string;
   prices: {
@@ -24,7 +18,9 @@ interface PaywallScreenProps {
   };
   storeConnected: boolean;
   storeCatalogLoaded: boolean;
+  storeBusy: boolean;
   storeError: string | null;
+  storeStatusLine: string | null;
   onAnnual: () => void;
   onMonthly: () => void;
   onFounding: () => void;
@@ -35,144 +31,140 @@ interface PaywallScreenProps {
 export function PaywallScreen({
   visible,
   copy,
+  language,
   mode,
   body,
   prices,
   storeConnected,
   storeCatalogLoaded,
+  storeBusy,
   storeError,
+  storeStatusLine,
   onAnnual,
   onMonthly,
   onFounding,
   onRestore,
   onClose,
 }: PaywallScreenProps) {
-  const isTurkish = copy.tabs.today === 'Bugun';
-  const entry = useSharedValue(0);
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    entry.value = withTiming(visible ? 1 : 0, {
-      duration: 260,
+    progress.value = withTiming(visible ? 1 : 0, {
+      duration: 220,
       easing: Easing.out(Easing.cubic),
     });
-  }, [entry, visible]);
+  }, [progress, visible]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: entry.value,
-    transform: [{ translateY: (1 - entry.value) * 24 }, { scale: 0.96 + entry.value * 0.04 }],
+    opacity: progress.value,
+    transform: [{ translateY: (1 - progress.value) * 24 }, { scale: 0.985 + progress.value * 0.015 }],
   }));
 
+  const headline = copy.paywall.pressureHeadline;
+  const supportLine = mode === 'soft-success' ? copy.paywall.supportSoft : copy.paywall.supportHard;
+  const primaryCta = copy.paywall.continueCta;
+  const benefits = copy.paywall.pressureBenefits;
+  const canRetryCatalog = Boolean(storeError) && storeConnected && !storeCatalogLoaded;
+  const purchaseDisabled = storeBusy || !storeConnected || (!storeCatalogLoaded && !canRetryCatalog);
+  const restoreDisabled = storeBusy || !storeConnected;
+
+  const storeLine =
+    storeStatusLine ??
+    (!storeConnected
+      ? body
+      : !storeCatalogLoaded
+        ? canRetryCatalog
+          ? language === 'tr'
+            ? 'Devam Et’e dokun ve mağazayı yeniden dene.'
+            : 'Tap Continue to retry the store.'
+          : copy.paywall.monthlySubline
+        : null);
+
+  const openTerms = () => {
+    void Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/');
+  };
+
   return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Animated.View style={[styles.sheet, animatedStyle]}>
-          <BlurView intensity={86} tint="dark" style={styles.blurFill}>
-            <ScrollView contentContainerStyle={styles.content}>
-              <Text style={styles.eyebrow}>
-                {mode === 'soft-success' ? 'MOMENTUM UPGRADE' : 'PROTECT THE DAY'}
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <View style={styles.header}>
+              <Text style={styles.eyebrow}>{copy.paywall.protectEyebrow}</Text>
+              <Text style={styles.title}>{headline}</Text>
+              <Text numberOfLines={1} style={styles.subtitle}>
+                {supportLine}
               </Text>
-              <Text style={styles.title}>
-                {mode === 'soft-success' ? copy.paywall.softTitle : copy.paywall.hardTitle}
-              </Text>
-              <Text style={styles.body}>{body}</Text>
+            </View>
 
-              <View style={styles.promiseCard}>
-                <Text style={styles.promiseTitle}>
-                  {isTurkish ? 'Pro neyi degistirir?' : 'What Pro actually changes'}
-                </Text>
-                <Text style={styles.promiseText}>
-                  {isTurkish
-                    ? 'Daha fazla ozellik degil. Daha az kayip, daha hizli toparlanma ve daha net yon.'
-                    : 'Not more features. Less loss, faster recovery, and clearer direction.'}
-                </Text>
-              </View>
-
-              <View style={styles.compare}>
-                <View style={styles.compareCol}>
-                  <Text style={styles.compareLabel}>{copy.paywall.free}</Text>
-                  <Text style={styles.compareItem}>
-                    {isTurkish ? 'Sinirli gunluk execution' : 'Limited daily execution'}
-                  </Text>
-                  <Text style={styles.compareItem}>
-                    {isTurkish ? 'Acilis seviyesinde rehberlik' : 'Opening-level guidance'}
-                  </Text>
-                  <Text style={styles.compareItem}>
-                    {isTurkish ? 'Temel toparlanma' : 'Basic recovery'}
-                  </Text>
+            <View style={styles.benefits}>
+              {benefits.map((benefit) => (
+                <View key={benefit} style={styles.benefitRow}>
+                  <View style={styles.benefitDot} />
+                  <Text style={styles.benefitText}>{benefit}</Text>
                 </View>
-                <View style={styles.compareColStrong}>
-                  <Text style={styles.compareLabel}>{copy.paywall.pro}</Text>
-                  <Text style={styles.compareItemStrong}>
-                    {isTurkish ? 'Sinirsiz execution' : 'Unlimited execution'}
-                  </Text>
-                  <Text style={styles.compareItemStrong}>
-                    {isTurkish ? 'Daha temiz yon ve daha derin okuma' : 'Sharper direction and deeper read'}
-                  </Text>
-                  <Text style={styles.compareItemStrong}>
-                    {isTurkish ? 'Daha guclu koruma ve recovery' : 'Stronger protection and recovery'}
-                  </Text>
-                </View>
-              </View>
+              ))}
+            </View>
 
-              <PaywallCard
-                title={copy.paywall.annual}
-                price={prices.yearly}
-                subline={copy.paywall.annualSubline}
-                badge={copy.paywall.annualBadge}
-                featured
-                onPress={onAnnual}
-              />
-              <PaywallCard
-                title={copy.paywall.monthly}
-                price={prices.monthly}
-                subline={copy.paywall.monthlySubline}
+            <View style={styles.planBlock}>
+              <View style={styles.planHero}>
+                <View style={styles.planHead}>
+                  <Text style={styles.planLabel}>{copy.paywall.annual}</Text>
+                  <Text style={styles.badge}>{copy.paywall.annualBadge}</Text>
+                </View>
+                <Text style={styles.planPrice}>{prices.yearly}</Text>
+                <Text style={styles.planSubline}>{copy.paywall.annualSubline}</Text>
+              </View>
+            </View>
+
+            <Pressable
+              disabled={purchaseDisabled}
+              onPress={onAnnual}
+              style={[styles.primaryButton, purchaseDisabled && styles.disabledButton]}
+            >
+              <Text style={styles.primaryText}>{primaryCta}</Text>
+            </Pressable>
+
+            <View style={styles.secondaryPlans}>
+              <Pressable
+                disabled={purchaseDisabled}
                 onPress={onMonthly}
-              />
-              <PaywallCard
-                title={copy.paywall.founding}
-                price={prices.founding}
-                subline={copy.paywall.foundingSubline}
-                badge={copy.paywall.foundingBadge}
+                style={[styles.secondaryPlanButton, purchaseDisabled && styles.disabledSecondary]}
+              >
+                <Text style={styles.secondaryPlanLabel}>{copy.paywall.monthly}</Text>
+                <Text style={styles.secondaryPlanPrice}>{prices.monthly}</Text>
+              </Pressable>
+
+              <Pressable
+                disabled={purchaseDisabled}
                 onPress={onFounding}
-              />
-
-              <View style={styles.storeStateCard}>
-                <Text style={styles.compareLabel}>{isTurkish ? 'Magaza durumu' : 'Store status'}</Text>
-                <Text style={styles.compareItem}>
-                  {storeConnected
-                    ? storeCatalogLoaded
-                      ? isTurkish
-                        ? 'Canli App Store katalogu baglandi'
-                        : 'Live App Store catalog connected'
-                      : isTurkish
-                        ? 'App Store kataloguna baglaniyor'
-                        : 'Connecting to App Store catalog'
-                    : isTurkish
-                      ? 'Bu ortamda native store kullanilamiyor'
-                      : 'Native store is unavailable in this environment'}
-                </Text>
-                {storeError ? <Text style={styles.storeError}>{storeError}</Text> : null}
-              </View>
-            </ScrollView>
-
-            <View style={styles.footer}>
-              <Pressable onPress={onAnnual} style={styles.primaryButton}>
-                <Text style={styles.primaryText}>{copy.paywall.startTrial}</Text>
-              </Pressable>
-              <Pressable onPress={onMonthly} style={styles.secondaryButton}>
-                <Text style={styles.secondaryText}>{copy.paywall.chooseMonthly}</Text>
-              </Pressable>
-              <Pressable onPress={onFounding} style={styles.secondaryButton}>
-                <Text style={styles.secondaryText}>{copy.paywall.chooseFounding}</Text>
-              </Pressable>
-              <Pressable onPress={onRestore} style={styles.ghostButton}>
-                <Text style={styles.ghostText}>{copy.paywall.restore}</Text>
-              </Pressable>
-              <Pressable onPress={onClose} style={styles.ghostButton}>
-                <Text style={styles.ghostText}>{copy.paywall.continueFree}</Text>
+                style={[styles.secondaryPlanButton, purchaseDisabled && styles.disabledSecondary]}
+              >
+                <Text style={styles.secondaryPlanLabel}>{copy.paywall.founding}</Text>
+                <Text style={styles.secondaryPlanPrice}>{prices.founding}</Text>
               </Pressable>
             </View>
-          </BlurView>
+
+            {body ? (
+              <Text numberOfLines={2} style={styles.contextLine}>
+                {body}
+              </Text>
+            ) : null}
+            {storeLine ? <Text style={styles.storeLine}>{storeLine}</Text> : null}
+            {storeError ? <Text style={styles.storeError}>{storeError}</Text> : null}
+
+            <View style={styles.footerLinks}>
+              <Pressable disabled={restoreDisabled} onPress={onRestore}>
+                <Text style={[styles.footerLink, restoreDisabled && styles.disabledFooterLink]}>{copy.paywall.restore}</Text>
+              </Pressable>
+              <Pressable onPress={openTerms}>
+                <Text style={styles.footerLink}>{copy.paywall.terms}</Text>
+              </Pressable>
+              <Pressable onPress={onClose}>
+                <Text style={styles.footerLink}>{copy.paywall.close}</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
         </Animated.View>
       </View>
     </Modal>
@@ -182,143 +174,211 @@ export function PaywallScreen({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: theme.colors.overlay,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    backgroundColor: 'rgba(0,0,0,0.72)',
   },
   sheet: {
-    maxHeight: '90%',
-    borderTopLeftRadius: theme.radius.lg,
-    borderTopRightRadius: theme.radius.lg,
-    borderTopWidth: 1,
-    borderColor: theme.colors.borderStrong,
+    maxHeight: '86%',
+    borderRadius: 28,
+    backgroundColor: '#0B0B0F',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
   },
-  blurFill: {
-    backgroundColor: 'rgba(6,6,6,0.92)',
-  },
   content: {
-    padding: theme.spacing.lg,
-    gap: theme.spacing.lg,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 28,
+    gap: 28,
+  },
+  header: {
+    gap: 8,
   },
   eyebrow: {
-    color: theme.colors.accent,
-    fontSize: theme.typography.meta,
+    color: '#00D4FF',
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 1.3,
   },
   title: {
-    color: theme.colors.text,
-    fontSize: theme.typography.h1,
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontSize: 40,
+    lineHeight: 44,
+    fontWeight: '800',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: -1.2,
   },
-  body: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
-    lineHeight: 22,
+  subtitle: {
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
-  promiseCard: {
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(212,162,76,0.22)',
-    backgroundColor: 'rgba(212,162,76,0.08)',
-    padding: theme.spacing.md,
-    gap: 6,
+  benefits: {
+    gap: 12,
   },
-  promiseTitle: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
-    fontWeight: '700',
-  },
-  promiseText: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
-    lineHeight: 22,
-  },
-  compare: {
+  benefitRow: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
+    alignItems: 'center',
+    gap: 12,
   },
-  compareCol: {
-    flex: 1,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
+  benefitDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#6C5CE7',
+  },
+  benefitText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  planBlock: {
+    borderRadius: 20,
+    backgroundColor: '#15151C',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  planHero: {
     gap: 8,
   },
-  compareColStrong: {
-    flex: 1,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    padding: theme.spacing.md,
-    gap: 8,
+  planHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  compareLabel: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
+  planLabel: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
   },
-  compareItem: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.label,
+  badge: {
+    color: '#0B0B0F',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+    fontFamily: 'Inter_700Bold',
+    backgroundColor: '#00D4FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
-  compareItemStrong: {
-    color: theme.colors.text,
-    fontSize: theme.typography.label,
-    fontWeight: '700',
+  planPrice: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: '800',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: -0.8,
   },
-  storeStateCard: {
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.md,
-    gap: 6,
-  },
-  storeError: {
-    color: theme.colors.danger,
-    fontSize: theme.typography.label,
+  planSubline: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 13,
     lineHeight: 18,
-  },
-  footer: {
-    padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
-    borderTopWidth: 1,
-    borderColor: theme.colors.border,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
   },
   primaryButton: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent,
-    paddingVertical: 16,
+    width: '100%',
+    minHeight: 56,
+    borderRadius: 20,
+    backgroundColor: '#6C5CE7',
     alignItems: 'center',
-    ...theme.shadow.gold,
+    justifyContent: 'center',
+    shadowColor: '#6C5CE7',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   primaryText: {
-    color: '#140d03',
-    fontSize: theme.typography.body,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.surfaceAlt,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  secondaryText: {
-    color: theme.colors.text,
-    fontSize: theme.typography.body,
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
   },
-  ghostButton: {
+  secondaryPlans: {
+    gap: 8,
+  },
+  secondaryPlanButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    minHeight: 42,
+    paddingHorizontal: 4,
   },
-  ghostText: {
-    color: theme.colors.textMuted,
-    fontSize: theme.typography.body,
+  disabledSecondary: {
+    opacity: 0.52,
+  },
+  secondaryPlanLabel: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  secondaryPlanPrice: {
+    color: 'rgba(255,255,255,0.66)',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+  },
+  contextLine: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
+  },
+  storeLine: {
+    color: 'rgba(255,255,255,0.44)',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
+  },
+  storeError: {
+    color: '#FF8A9B',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+    paddingTop: 6,
+  },
+  footerLink: {
+    color: 'rgba(255,255,255,0.42)',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+  },
+  disabledFooterLink: {
+    opacity: 0.42,
   },
 });

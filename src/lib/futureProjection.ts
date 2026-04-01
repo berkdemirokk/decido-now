@@ -15,8 +15,7 @@ export function buildFutureProjection(
   const reviewed = decisions.filter((decision) => decision.reviewedAt);
   const similar = reviewed.filter(
     (decision) =>
-      decision.selectedSuggestion.category === suggestion.category ||
-      decision.context.goal === context.goal
+      decision.selectedSuggestion.category === suggestion.category || decision.context.goal === context.goal
   );
   const avgScore = similar.length
     ? Number(
@@ -26,14 +25,14 @@ export function buildFutureProjection(
       )
     : null;
 
-  const positive = buildPositiveProjection(context.goal, suggestion.category, language, avgScore);
-  const negative = buildNegativeProjection(context.goal, suggestion.category, language);
-  const teaser =
-    language === 'tr'
-      ? '7 gunluk momentum gorunumu Pro ile acilir.'
-      : 'Unlock your 7-day momentum view with Pro.';
-
-  return { positive, negative, teaser };
+  return {
+    positive: buildPositiveProjection(context.goal, suggestion.category, language, avgScore),
+    negative: buildNegativeProjection(context.goal, suggestion.category, language),
+    teaser:
+      language === 'tr'
+        ? '7 günlük momentum görünümü Pro ile açılır.'
+        : 'Unlock the 7-day momentum view with Pro.',
+  };
 }
 
 function buildPositiveProjection(
@@ -45,69 +44,69 @@ function buildPositiveProjection(
   const scoreLine =
     avgScore != null
       ? language === 'tr'
-        ? ` Benzer hamlelerin ortalama skoru su an ${avgScore}/5 civarinda.`
+        ? ` Benzer hamlelerde ortalaman şu an ${avgScore}/5 civarında.`
         : ` Similar moves are scoring around ${avgScore}/5 for you right now.`
       : '';
 
   if (language === 'tr') {
     if (goal === 'earn' || category === 'earn' || category === 'money') {
-      return `Bugun bu hamleyi tamamlarsan, sonraki 7 gunde gelir veya para tarafinda ikinci bir gorunur adim atman daha kolaylasabilir.${scoreLine}`;
+      return `Bunu bugün kapatırsan, önündeki 7 günde ikinci gelir hamlesi çok daha az dirençle açılır.${scoreLine}`;
     }
 
     if (goal === 'learn' || category === 'learn' || category === 'language') {
-      return `Bugun bu hamleyi tamamlarsan, sonraki 7 gunde ogrenme akisini sifirdan degil, mevcut momentumun ustunden devam ettirebilirsin.${scoreLine}`;
+      return `Bunu bugün kapatırsan, önündeki 7 gün öğrenme akışı sıfırdan değil mevcut momentumun üstünden ilerler.${scoreLine}`;
     }
 
     if (goal === 'reset' || category === 'health' || category === 'reset') {
-      return `Bugun bu hamleyi tamamlarsan, sonraki 7 gunde enerji ve zihinsel aciklik tarafinda daha temiz baslangiclar gorebilirsin.${scoreLine}`;
+      return `Bunu bugün kapatırsan, önündeki 7 gün enerji ve karar kalitesi daha temiz bir zeminde çalışır.${scoreLine}`;
     }
 
-    return `Bugun bu hamleyi tamamlarsan, sonraki 7 gunde karar alma surtunmesi azalabilir ve benzer adimlara daha hizli girebilirsin.${scoreLine}`;
+    return `Bunu bugün kapatırsan, önündeki 7 günde benzer kararları çok daha hızlı execution’a çevirebilirsin.${scoreLine}`;
   }
 
   if (goal === 'earn' || category === 'earn' || category === 'money') {
-    return `If you complete this today, the next 7 days may feel easier for a second visible money or earning move.${scoreLine}`;
+    return `Complete this today and the next 7 days should open a second money move with less resistance.${scoreLine}`;
   }
 
   if (goal === 'learn' || category === 'learn' || category === 'language') {
-    return `If you complete this today, the next 7 days may carry more learning momentum instead of forcing you to restart.${scoreLine}`;
+    return `Complete this today and the next 7 days should carry more learning momentum instead of forcing a restart.${scoreLine}`;
   }
 
   if (goal === 'reset' || category === 'health' || category === 'reset') {
-    return `If you complete this today, the next 7 days may start with cleaner energy and lower friction.${scoreLine}`;
+    return `Complete this today and the next 7 days may run on cleaner energy and lower drag.${scoreLine}`;
   }
 
-  return `If you complete this today, the next 7 days may feel lighter because similar decisions become easier to re-enter.${scoreLine}`;
+  return `Complete this today and the next 7 days should feel lighter because similar decisions reopen faster.${scoreLine}`;
 }
 
 function buildNegativeProjection(goal: Goal, category: Category, language: SupportedLanguage) {
   if (language === 'tr') {
     if (goal === 'earn' || category === 'earn' || category === 'money') {
-      return 'Bugun pas gecersen, para tarafindaki belirsizlik ve ertelenen cikis hissi bir kac gun daha uzayabilir.';
+      return 'Bunu bugün pas geçersen, para tarafındaki sis birkaç gün daha dağılmadan kalabilir.';
     }
 
     if (goal === 'learn' || category === 'learn' || category === 'language') {
-      return 'Bugun pas gecersen, bu alan yarin yeniden sifirdan baslanacak bir gorev gibi hissedebilir.';
+      return 'Bunu bugün pas geçersen, yarın aynı alan yeniden sıfırdan açılacak bir görev gibi hissedebilir.';
     }
 
     if (goal === 'reset' || category === 'health' || category === 'reset') {
-      return 'Bugun pas gecersen, zihinsel ya da bedensel surtunme yarina tasinabilir.';
+      return 'Bunu bugün pas geçersen, mevcut sürtünme yarına sarkabilir ve başlangıcı ağırlaştırabilir.';
     }
 
-    return 'Bugun pas gecersen, ayni konuda karar vermek yarin daha agir hissedebilir.';
+    return 'Bunu bugün pas geçersen, aynı karar yarın daha ağır ve daha pahalı hissedebilir.';
   }
 
   if (goal === 'earn' || category === 'earn' || category === 'money') {
-    return 'If you skip today, the money-side hesitation may stay vague for a few more days.';
+    return 'Skip this today and the money-side fog may stay vague for a few more days.';
   }
 
   if (goal === 'learn' || category === 'learn' || category === 'language') {
-    return 'If you skip today, this area may feel like a fresh restart again tomorrow.';
+    return 'Skip this today and this area may feel like a full restart again tomorrow.';
   }
 
   if (goal === 'reset' || category === 'health' || category === 'reset') {
-    return 'If you skip today, the current mental or physical friction may carry into tomorrow.';
+    return 'Skip this today and the current friction may leak into tomorrow.';
   }
 
-  return 'If you skip today, the same decision may feel heavier tomorrow.';
+  return 'Skip this today and the same decision may feel heavier tomorrow.';
 }

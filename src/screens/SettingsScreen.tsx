@@ -1,16 +1,13 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { WidgetPreview } from '../components/WidgetPreview';
 import { UiCopy } from '../lib/uiCopy';
-import { PlanTier, SupportedLanguage, SystemId } from '../types';
+import { PlanTier, SupportedLanguage } from '../types';
 import { theme } from '../theme';
 
 interface SettingsScreenProps {
   copy: UiCopy;
   language: SupportedLanguage;
   plan: PlanTier;
-  currentSystem: SystemId;
-  currentMoveTitle: string;
   onOpenPaywall: () => void;
   onRestore: () => void;
   onManage: () => void;
@@ -22,62 +19,47 @@ export function SettingsScreen({
   copy,
   language,
   plan,
-  currentSystem,
-  currentMoveTitle,
   onOpenPaywall,
   onRestore,
   onManage,
   onLanguage,
   onGiftMove,
 }: SettingsScreenProps) {
-  const isTurkish = copy.tabs.today === 'Bugun';
+  const isTurkish = language === 'tr';
+  const planLabel =
+    plan === 'founding'
+      ? isTurkish
+        ? 'Kurucu'
+        : 'Founding'
+      : plan === 'pro-yearly'
+        ? copy.paywall.annual
+        : plan === 'pro-monthly'
+          ? copy.paywall.monthly
+          : copy.paywall.free;
+
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>{copy.settings.title}</Text>
 
-      <Pressable onPress={onOpenPaywall} style={styles.primaryCard}>
-        <Text style={styles.primaryTitle}>{copy.settings.upgrade}</Text>
-        <Text style={styles.primaryBody}>
-          {plan === 'founding'
-            ? isTurkish
-              ? 'Altin rozet aktif. Ozel DNA katmanlari ve erken erisim sistemleri acik.'
-              : 'Gold badge live. Exclusive DNA layers and early-access systems are open.'
-            : isTurkish
-              ? 'Sinirsiz execution, daha guclu toparlanma ve daha derin okuma acilir.'
-              : 'Unlock unlimited execution, stronger recovery, and deeper pattern reading.'}
-        </Text>
+      <Pressable onPress={onOpenPaywall} style={styles.heroRow}>
+        <View style={styles.heroCopy}>
+          <Text style={styles.heroLabel}>{copy.paywall.pro}</Text>
+          <Text style={styles.heroTitle}>{copy.settings.upgrade}</Text>
+          <Text style={styles.heroBody}>
+            {isTurkish
+              ? 'Daha net yön, daha güçlü toparlanma ve daha az sürtünme.'
+              : 'Cleaner direction, stronger recovery, and less friction.'}
+          </Text>
+        </View>
+        <Text style={styles.planPill}>{planLabel}</Text>
       </Pressable>
 
-      <View style={styles.widgetSection}>
-        <Text style={styles.sectionLabel}>{copy.settings.widgets}</Text>
-        <View style={styles.widgetRow}>
-          <WidgetPreview
-            size="small"
-            systemId={currentSystem}
-            moveTitle={currentMoveTitle}
-            timeLeft="08:00"
-            progress={0.58}
-          />
-          <WidgetPreview
-            size="medium"
-            systemId={currentSystem}
-            moveTitle={currentMoveTitle}
-            timeLeft="08:00 left"
-            progress={0.58}
-          />
-        </View>
-      </View>
-
-      <SettingsRow label={copy.settings.gift} value={isTurkish ? '1 ucretsiz acilim' : '1 free unlock'} onPress={onGiftMove} />
+      <SettingsRow label={copy.settings.language} value={language.toUpperCase()} onPress={onLanguage} />
       <SettingsRow label={copy.settings.restore} value="App Store" onPress={onRestore} />
-      <SettingsRow label={copy.settings.manage} value={isTurkish ? 'Abonelik' : 'Subscription'} onPress={onManage} />
-      <SettingsRow
-        label={copy.settings.language}
-        value={language.toUpperCase()}
-        onPress={onLanguage}
-      />
+      <SettingsRow label={copy.settings.manage} value={planLabel} onPress={onManage} />
+      <SettingsRow label={copy.settings.gift} value={isTurkish ? '1 açılım' : '1 unlock'} onPress={onGiftMove} />
 
-      <View style={styles.infoCard}>
+      <View style={styles.infoBlock}>
         <Text style={styles.infoLabel}>{copy.settings.disclaimer}</Text>
         <Text style={styles.infoBody}>{copy.settings.safety}</Text>
       </View>
@@ -106,47 +88,62 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.lg,
     gap: theme.spacing.lg,
-    paddingBottom: 140,
+    paddingBottom: 132,
   },
   title: {
     color: theme.colors.text,
     fontSize: theme.typography.display,
-    fontWeight: '700',
+    fontWeight: '900',
+    letterSpacing: -1.1,
   },
-  primaryCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
+  heroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: theme.colors.accent,
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: 'rgba(255,255,255,0.03)',
     padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
   },
-  primaryTitle: {
+  heroCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  heroLabel: {
+    color: theme.colors.accent,
+    fontSize: theme.typography.meta,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  heroTitle: {
     color: theme.colors.text,
     fontSize: theme.typography.h2,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  primaryBody: {
+  heroBody: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.body,
     lineHeight: 22,
   },
-  widgetSection: {
-    gap: theme.spacing.sm,
-  },
-  sectionLabel: {
-    color: theme.colors.textSoft,
+  planPill: {
+    alignSelf: 'flex-start',
+    color: theme.colors.text,
     fontSize: theme.typography.meta,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  widgetRow: {
-    gap: theme.spacing.md,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
     paddingVertical: 18,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
@@ -154,24 +151,21 @@ const styles = StyleSheet.create({
   rowLabel: {
     color: theme.colors.text,
     fontSize: theme.typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   rowValue: {
-    color: theme.colors.textMuted,
+    color: theme.colors.textSoft,
     fontSize: theme.typography.body,
+    fontWeight: '600',
   },
-  infoCard: {
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.lg,
+  infoBlock: {
     gap: theme.spacing.sm,
+    paddingTop: 6,
   },
   infoLabel: {
     color: theme.colors.text,
     fontSize: theme.typography.body,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   infoBody: {
     color: theme.colors.textMuted,

@@ -12,11 +12,12 @@ const DEFAULT_RECOMMENDATION: RecommendationCard = {
     budget: 'free',
     category: 'focus',
   },
-  title: 'Bugun net bir kapatma hamlesi yap',
-  body: 'Kisa sureli, odakli ve bitis cizgisi net bir gorevle baslamak senden daha cok aksiyon cikariyor.',
-  todayGain: 'Bugun gorunur bir kapanis ve daha temiz bir odak kazanirsin.',
-  tomorrowGain: 'Yarin daha az surtunmeyle ikinci hamleye girebilirsin.',
-  shareLine: 'Today I picked one clear move and turned hesitation into action.',
+  title: 'Bugün tek net execution hamlesini aç',
+  body:
+    'Kısa, kapanabilir ve çizgisi net bir blok; aşırı düşünmeyi susturup seni doğrudan harekete geçirir.',
+  todayGain: 'Bugün görünür bir kapanış ve daha temiz bir odak zemini kazanırsın.',
+  tomorrowGain: 'Yarın ikinci hamleye çok daha az sürtünmeyle girersin.',
+  shareLine: 'Today I picked one clean move and turned hesitation into execution.',
 };
 
 export interface RecommendationCard {
@@ -68,10 +69,11 @@ export function buildTodayRecommendation(decisions: DecisionRecord[]): Recommend
   const bestEnergy = getTopScored(reviewed, (decision) => decision.context.energy);
   const bestMinutes = getBestMinutes(reviewed);
 
+  const category = (bestCategory?.key ?? 'focus') as Category;
   const context: DecisionContext = {
     goal: bestGoal?.key ?? 'finish',
     friction: bestFriction?.key ?? 'unclear',
-    category: bestCategory?.key ?? 'focus',
+    category,
     mode: bestMode?.key ?? 'quick-win',
     energy: bestEnergy?.key ?? 'mid',
     minutes: bestMinutes,
@@ -80,11 +82,11 @@ export function buildTodayRecommendation(decisions: DecisionRecord[]): Recommend
 
   return {
     context,
-    title: buildTitle(context.goal, (bestCategory?.key ?? 'focus') as Category),
-    body: buildBody(context.goal, context.friction, bestMinutes),
-    todayGain: buildTodayGain(context.goal, (bestCategory?.key ?? 'focus') as Category, bestMinutes),
-    tomorrowGain: buildTomorrowGain(context.goal, (bestCategory?.key ?? 'focus') as Category),
-    shareLine: buildShareLine(context.goal, (bestCategory?.key ?? 'focus') as Category),
+    title: buildTitle(context.goal, category),
+    body: buildBody(context.goal, context.friction, category, bestMinutes),
+    todayGain: buildTodayGain(context.goal, category, bestMinutes),
+    tomorrowGain: buildTomorrowGain(context.goal, category),
+    shareLine: buildShareLine(context.goal, category),
   };
 }
 
@@ -93,9 +95,10 @@ export function buildThreeDayPlan(decisions: DecisionRecord[]): ThreeDayPlan {
 
   if (reviewed.length < 3) {
     return {
-      title: '72 saatlik mikro hedefini ac',
-      body: 'Onumuzdeki 3 gunde tek bir alan sec ve her gun gorunur tek adim at. Buyuk plan degil, arka arkaya 3 temiz hamle.',
-      metric: '3 gun / 3 hamle',
+      title: '72 saatlik momentum blueprint’ini aç',
+      body:
+        'Önündeki 3 günde tek alan seç. Her gün tek görünür kapanış al. Büyük plan değil; arka arkaya 3 temiz execution.',
+      metric: '3 gün · 3 hamle',
     };
   }
 
@@ -106,36 +109,37 @@ export function buildThreeDayPlan(decisions: DecisionRecord[]): ThreeDayPlan {
   const completionCount = lastThree.filter((decision) => decision.completion === 'done').length;
 
   return {
-    title: `72 saatte ${describeGoal(strongestGoal)} odakli mini seri`,
-    body: `Sende en cok calisan alan su an ${describeCategory(strongestCategory)}. Onumuzdeki 3 gunde bu alanda arka arkaya 3 kisa hamle yapmak momentumu buyutebilir.`,
+    title: `72 saatte ${describeGoal(strongestGoal)} tarafında seri kur`,
+    body: `Sende en temiz çalışan alan şu an ${describeCategory(
+      strongestCategory
+    )}. Önündeki 3 günde bu şeritte art arda 3 kısa hamle, dağınık motivasyondan daha fazla momentum üretebilir.`,
     metric: `${completionCount}/3 son seri`,
   };
 }
 
 export function buildWeeklySummary(decisions: DecisionRecord[]): WeeklySummary {
-  const recent = decisions
-    .filter((decision) => decision.reviewedAt)
-    .slice(0, 7);
+  const recent = decisions.filter((decision) => decision.reviewedAt).slice(0, 7);
 
   if (recent.length === 0) {
     return {
-      title: 'Haftalik ritim daha yeni basliyor',
-      body: 'Ilk birkac skordan sonra burada hangi alanlarda ivme kazandigin ve nerede surtundugun daha net gorunecek.',
-      metric: '0 skorlanan karar',
+      title: 'Haftalık ritim daha yeni kuruluyor',
+      body: 'İlk birkaç skor geldikçe hangi hamle formatının sende gerçekten kapandığı daha net okunacak.',
+      metric: '0 skorlanan hamle',
     };
   }
 
   const doneCount = recent.filter((decision) => decision.completion === 'done').length;
-  const averageScore = Math.round(
-    (recent.reduce((sum, decision) => sum + (decision.resultScore ?? 0), 0) / recent.length) * 10
-  ) / 10;
+  const averageScore =
+    Math.round((recent.reduce((sum, decision) => sum + (decision.resultScore ?? 0), 0) / recent.length) * 10) / 10;
   const bestCategory =
     getTopScored(recent, (decision) => decision.selectedSuggestion.category)?.key ?? 'focus';
 
   return {
-    title: `${describeCategory(bestCategory)} tarafinda haftalik momentum var`,
-    body: `Son ${recent.length} skorlanan kararda ${doneCount} tanesini tam kapattin. Ortalama sonuc skorun ${averageScore}/5 ve en guclu alanin ${describeCategory(bestCategory)} olarak gorunuyor.`,
-    metric: `${doneCount}/${recent.length} tamamlama`,
+    title: `${describeCategory(bestCategory)} tarafında haftalık momentum birikiyor`,
+    body: `Son ${recent.length} skorlanan hamlede ${doneCount} temiz kapanış aldın. Ortalama skorun ${averageScore}/5 ve en güçlü şeridin şu an ${describeCategory(
+      bestCategory
+    )} olarak görünüyor.`,
+    metric: `${doneCount}/${recent.length} kapanış`,
   };
 }
 
@@ -144,40 +148,43 @@ export function buildWeeklyLifeReport(decisions: DecisionRecord[]): WeeklyLifeRe
 
   if (!recent.length) {
     return {
-      title: 'Haftalik hayat raporu daha yeni basliyor',
+      title: 'Haftalık rapor daha yeni ısınıyor',
       summary:
-        'Birkaç skorlanan hamleden sonra burada seni ileri tasiyan alanlari, zorlandigin paternleri ve sonraki odak noktasini goreceksin.',
-      wins: ['Ilk gorev: 3 hamleyi skorlama aliskanligi kur.'],
-      risks: ['Sistem henuz seni taniyacak kadar veri gormedi.'],
-      nextFocus: 'Bu hafta tek bir alanda ust uste temiz hamleler biriktir.',
+        'Biraz daha skor biriktiğinde seni ileri taşıyan şeritleri, zayıf düşen anları ve sonraki odak alanını burada net görürsün.',
+      wins: ['İlk iş: 3 hamleyi gerçekten skorlamak.'],
+      risks: ['Sistem henüz seni keskin okuyacak kadar veri görmedi.'],
+      nextFocus: 'Bu hafta tek alanda art arda temiz kapanış biriktir.',
     };
   }
 
-  const bestCategory =
-    getTopScored(recent, (decision) => decision.selectedSuggestion.category)?.key ?? 'focus';
+  const bestCategory = getTopScored(recent, (decision) => decision.selectedSuggestion.category)?.key ?? 'focus';
   const bestGoal = getTopScored(recent, (decision) => decision.context.goal)?.key ?? 'finish';
   const frictionRisk = getLowestScored(recent, (decision) => decision.context.friction)?.key ?? 'unclear';
   const unfinished = recent.filter((decision) => decision.completion !== 'done').length;
   const avgScore =
-    Math.round(
-      (recent.reduce((sum, decision) => sum + (decision.resultScore ?? 0), 0) / recent.length) * 10
-    ) / 10;
+    Math.round((recent.reduce((sum, decision) => sum + (decision.resultScore ?? 0), 0) / recent.length) * 10) / 10;
 
   return {
-    title: `${describeCategory(bestCategory)} tarafinda hayat ritmi olusuyor`,
-    summary: `Son ${recent.length} skorlanan hamlede ortalama sonuc puanin ${avgScore}/5. En cok guc aldigin yon ${describeCategory(bestCategory)}, en cok momentum ureten niyet ise ${describeGoal(bestGoal)} oldu.`,
+    title: `${describeCategory(bestCategory)} tarafında yeni bir ritim oluşuyor`,
+    summary: `Son ${recent.length} skorlanan hamlede ortalama sonucun ${avgScore}/5. En güçlü yönün ${describeCategory(
+      bestCategory
+    )}, en çok momentum üreten niyetin ise ${describeGoal(bestGoal)} oldu.`,
     wins: [
-      `${describeCategory(bestCategory)} kararlarinda tekrar eden bir guc var.`,
-      `${describeGoal(bestGoal)} niyetli hamleler sende daha cok geri donus uretiyor.`,
-      unfinished <= 2 ? 'Skorladigin hamlelerin cogu gorunur kapanisla bitiyor.' : 'Yarim kalanlari azaltirsan sistem daha da hizlanacak.',
+      `${describeCategory(bestCategory)} hamlelerinde tekrar eden bir güç var.`,
+      `${describeGoal(bestGoal)} niyeti sende daha fazla geri dönüş üretiyor.`,
+      unfinished <= 2
+        ? 'Skorladığın hamlelerin çoğu görünür kapanışla bitiyor.'
+        : 'Yarım kalanları biraz daha düşürürsen sistem ciddi hız kazanır.',
     ],
     risks: [
-      `${describeFriction(frictionRisk)} anlarinda sistemin daha kolay dagiliyor.`,
+      `${describeFriction(frictionRisk)} anlarında sistem daha kolay dağılıyor.`,
       unfinished > 2
-        ? 'Son hamlelerde kapanis orani dusuyor; aksam check-in daha kritik hale geldi.'
-        : 'Yeni patern olusuyor ama sureklilik icin aksam sonucu girmek gerekiyor.',
+        ? 'Son hamlelerde kapanış oranı düştü; akşam check-in bu yüzden daha kritik.'
+        : 'Yeni patern oluşuyor ama ritmi korumak için akşam sonucu girmek şart.',
     ],
-    nextFocus: `Bu hafta tek odagin su olsun: ${describeGoal(bestGoal)} tarafinda ${describeCategory(bestCategory)} alanini ust uste 3 hamle boyunca korumak.`,
+    nextFocus: `Bu hafta tek odağın şu olsun: ${describeGoal(bestGoal)} tarafında ${describeCategory(
+      bestCategory
+    )} şeridini art arda 3 hamle korumak.`,
   };
 }
 
@@ -186,8 +193,8 @@ export function buildReturnLoopCard(decisions: DecisionRecord[]): ReturnLoopCard
 
   if (pending > 0) {
     return {
-      title: 'Tonight check-in',
-      body: `Bugun baslattigin ${pending} hamle icin gece tek bir sonuc gir. Sistem asıl orada akillaniyor.`,
+      title: 'Bu akşam kilidi kapat',
+      body: `Bugün başlattığın ${pending} hamle için gece tek bir sonuç gir. Sistem asıl keskinliğini orada kazanıyor.`,
       metric: `${pending} bekleyen skor`,
     };
   }
@@ -196,11 +203,11 @@ export function buildReturnLoopCard(decisions: DecisionRecord[]): ReturnLoopCard
   const allStrong = recent.length > 0 && recent.every((decision) => (decision.resultScore ?? 0) >= 4);
 
   return {
-    title: allStrong ? 'Tomorrow is ready' : 'Return tonight',
+    title: allStrong ? 'Yarın hazır' : 'Bu akşam geri dön',
     body: allStrong
-      ? 'Bugun guclu bir seri kurdun. Yarin sabah tek hamleyle devam etmen yeterli.'
-      : 'Aksam bir hamleyi skorlamak, yarin gelecek onerinin kalitesini belirler.',
-    metric: allStrong ? 'yarin sabah ac' : 'aksam 1 skor',
+      ? 'Bugün temiz bir seri kurdun. Yarın sabah tek hamleyle yeniden açılman yeterli.'
+      : 'Akşam girilen tek skor, yarın gelecek hamlenin kalitesini ciddi biçimde yükseltir.',
+    metric: allStrong ? 'yarın sabah aç' : 'akşam 1 skor',
   };
 }
 
@@ -236,140 +243,142 @@ function getLowestScored<T extends string>(
 
 function getBestMinutes(decisions: DecisionRecord[]) {
   const buckets = decisions.reduce<Record<string, number>>((accumulator, decision) => {
-    const bucket = decision.selectedSuggestion.minutes <= 10 ? 'short' : decision.selectedSuggestion.minutes <= 20 ? 'medium' : 'long';
+    const bucket =
+      decision.selectedSuggestion.minutes <= 10 ? 'short' : decision.selectedSuggestion.minutes <= 20 ? 'medium' : 'long';
     accumulator[bucket] = (accumulator[bucket] ?? 0) + getContribution(decision);
     return accumulator;
   }, {});
 
   const top = Object.entries(buckets).sort((left, right) => right[1] - left[1])[0]?.[0];
 
-  if (top === 'long') {
-    return 30;
-  }
-
-  if (top === 'medium') {
-    return 15;
-  }
-
+  if (top === 'long') return 30;
+  if (top === 'medium') return 15;
   return 10;
 }
 
 function getContribution(decision: DecisionRecord) {
-  const completion =
-    decision.completion === 'done' ? 1 : decision.completion === 'partial' ? 0.35 : -0.6;
+  const completion = decision.completion === 'done' ? 1 : decision.completion === 'partial' ? 0.35 : -0.6;
   const score = decision.resultScore ? (decision.resultScore - 3) * 0.45 : 0;
   return completion + score;
 }
 
 function buildTitle(goal: Goal, category: Category) {
   if (goal === 'learn' && category === 'language') {
-    return 'Bugun dili kisa bir turla ilerlet';
+    return 'Bugün dil prime’ını aç';
   }
 
   if (goal === 'earn') {
-    return 'Bugun gelir tarafinda tek net adim at';
+    return 'Bugün tek gelir execution’ını aç';
   }
 
   if (goal === 'reset') {
-    return 'Bugun sistemi once toparla';
+    return 'Bugün önce sistemi temizle';
   }
 
   if (goal === 'build') {
-    return 'Bugun uretime gecmek icin kucuk bir blok ac';
+    return 'Bugün üretim blueprint’ini başlat';
   }
 
-  return 'Bugun net bir hamleyle momentum ac';
+  return 'Bugün tek net hamleyle momentumu aç';
 }
 
-function buildBody(goal: Goal, friction: Friction, minutes: number) {
+function buildBody(goal: Goal, friction: Friction, category: Category, minutes: number) {
   if (goal === 'earn') {
-    return `${minutes} dakikalik, sonucu gorunur bir gelir hamlesi bugun senin icin en guvenli baslangic gibi duruyor.`;
+    return `${minutes} dakikalık görünür bir gelir hamlesi, bugünün en temiz çıkışı gibi duruyor. Para tarafında fazla düşünmek yerine execution açman gerekiyor.`;
   }
 
   if (goal === 'learn') {
-    return `${minutes} dakikalik ogrenme sprintleri sende daha cok devam hissi uretiyor; ozellikle ${describeFriction(friction)} anlarinda iyi calisiyor.`;
+    return `${minutes} dakikalık bir öğrenme sprinti sende daha fazla devam hissi üretiyor. Özellikle ${describeFriction(
+      friction
+    )} anlarında bu format düşünceyi netliğe çeviriyor.`;
   }
 
-  return `${minutes} dakikalik temiz bir adim, ${describeFriction(friction)} anlarinda senden daha cok aksiyon cikariyor.`;
+  if (category === 'reset' || category === 'health') {
+    return `${minutes} dakikalık kısa bir reset bloğu, bugünün sürtünmesini indirip karar DNA’nı tekrar prime eder.`;
+  }
+
+  return `${minutes} dakikalık temiz bir blok, ${describeFriction(
+    friction
+  )} anlarında senden daha çok aksiyon çıkarıyor. Bugün ihtiyacın olan şey tam olarak bu.`;
 }
 
 function buildTodayGain(goal: Goal, category: Category, minutes: number) {
   if (goal === 'earn' || category === 'earn' || category === 'money') {
-    return `${minutes} dakika sonunda para ya da gelir tarafinda gorunur bir cikis noktan olur.`;
+    return `${minutes} dakika sonunda para ya da gelir tarafında görünür bir çıkış noktan olur.`;
   }
 
   if (goal === 'learn' || category === 'learn' || category === 'language') {
-    return `${minutes} dakika sonunda daginik bilgi yerine somut bir ogrenme kazanimi cikarmis olursun.`;
+    return `${minutes} dakika sonunda dağınık bilgi yerine taşınabilir bir öğrenme kazanımı çıkarırsın.`;
   }
 
   if (goal === 'reset' || category === 'health' || category === 'reset') {
-    return `${minutes} dakika sonunda enerji ya da zihinsel gurultu tarafinda gorunur bir rahatlama beklenir.`;
+    return `${minutes} dakika sonunda enerji, beden ya da zihinsel gürültü tarafında görünür bir rahatlama açılır.`;
   }
 
   if (category === 'social') {
-    return `${minutes} dakika sonunda sosyal surtunmeyi azaltan gorunur bir temas acmis olursun.`;
+    return `${minutes} dakika sonunda sosyal sürtünmeyi azaltan görünür bir temas açmış olursun.`;
   }
 
-  return `${minutes} dakika sonunda bugun icin gorunur bir ilerleme ve daha temiz bir odak kazanirsin.`;
+  return `${minutes} dakika sonunda bugüne yazılmış görünür bir ilerleme ve daha temiz bir odak kazanırsın.`;
 }
 
 function buildTomorrowGain(goal: Goal, category: Category) {
   if (goal === 'earn' || category === 'earn' || category === 'money') {
-    return 'Yarin ikinci bir outreach, teklif ya da para karari cok daha kolay acilir.';
+    return 'Yarın ikinci outreach, teklif ya da para kararı çok daha hafif açılır.';
   }
 
   if (goal === 'learn' || category === 'learn' || category === 'language') {
-    return 'Yarin ayni konuyu surdurmek icin sifirdan baslamak zorunda kalmazsin.';
+    return 'Yarın aynı konuyu yeniden sıfırdan kurmak zorunda kalmazsın.';
   }
 
   if (goal === 'reset' || category === 'health' || category === 'reset') {
-    return 'Yarin karar kalitesi daha temiz bir enerji zemini ustunde calisir.';
+    return 'Yarın karar kalitesi daha temiz bir enerji zemini üstünde çalışır.';
   }
 
   if (category === 'social') {
-    return 'Yarin takip mesajlari ya da yeni bag kurma adimlari daha dusuk direncle gelir.';
+    return 'Yarın yeni temas ya da takip mesajı çok daha düşük dirençle gelir.';
   }
 
-  return 'Yarin bir sonraki hamleye daha az surtunmeyle gecersin.';
+  return 'Yarın bir sonraki hamleye daha az sürtünmeyle geçersin.';
 }
 
 function buildShareLine(goal: Goal, category: Category) {
   if (goal === 'earn' || category === 'earn' || category === 'money') {
-    return 'Today I picked one earning move and turned vague money stress into action.';
+    return 'Today I made one earning move and turned vague money pressure into execution.';
   }
 
   if (goal === 'learn' || category === 'learn' || category === 'language') {
-    return 'Today I picked one learning move and turned scattered attention into progress.';
+    return 'Today I made one learning move and turned scattered attention into traction.';
   }
 
   if (goal === 'reset' || category === 'health' || category === 'reset') {
-    return 'Today I picked one reset move and cleared space for a better tomorrow.';
+    return 'Today I made one reset move and gave tomorrow cleaner ground.';
   }
 
-  return 'Today I picked one smart move and stopped overthinking.';
+  return 'Today I made one smart move and stopped overthinking long enough to act.';
 }
 
 function describeGoal(goal: Goal) {
   switch (goal) {
     case 'learn':
-      return 'ogrenme';
+      return 'öğrenme';
     case 'earn':
       return 'gelir';
     case 'reset':
       return 'toparlanma';
     case 'connect':
-      return 'bag kurma';
+      return 'bağ kurma';
     case 'build':
-      return 'uretim';
+      return 'üretim';
     default:
-      return 'tamamlama';
+      return 'kapatma';
   }
 }
 
 function describeCategory(category: Category) {
   switch (category) {
     case 'learn':
-      return 'ogrenme';
+      return 'öğrenme';
     case 'language':
       return 'dil';
     case 'earn':
@@ -383,9 +392,9 @@ function describeCategory(category: Category) {
     case 'reset':
       return 'reset';
     case 'growth':
-      return 'gelisim';
+      return 'gelişim';
     default:
-      return 'odak';
+      return 'focus';
   }
 }
 
@@ -394,12 +403,12 @@ function describeFriction(friction: Friction) {
     case 'unclear':
       return 'belirsizlik';
     case 'distracted':
-      return 'dikkat daginikligi';
+      return 'dikkat dağınıklığı';
     case 'tired':
-      return 'dusuk enerji';
+      return 'düşük enerji';
     case 'anxious':
-      return 'kaygi';
+      return 'kaygı';
     case 'avoidant':
-      return 'kacinma';
+      return 'kaçınma';
   }
 }

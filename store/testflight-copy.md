@@ -1,8 +1,8 @@
-# Decido TestFlight Copy
+# Decido Now TestFlight Copy
 
 ## What to Test
 
-Decido helps you stop overthinking and make one clear move in seconds.
+Decido Now helps you stop overthinking and make one clear move in seconds.
 
 Please test:
 

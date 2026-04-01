@@ -29,7 +29,9 @@ export type PlanTier = 'free' | 'pro-monthly' | 'pro-yearly' | 'founding';
 
 export type SystemId = 'decide' | 'learn' | 'earn' | 'move' | 'reset';
 
-export type AppTabKey = 'today' | 'systems' | 'progress' | 'settings';
+export type GrowthDirectionId = 'mind' | 'body' | 'social' | 'money' | 'reset';
+
+export type AppTabKey = 'today' | 'progress' | 'settings';
 
 export type PersonaArchetype =
   | 'the-perfectionist'
@@ -191,6 +193,8 @@ export interface AppData {
   onboardingDone: boolean;
   onboardingCompletedAt: string | null;
   firstActivatedAt: string | null;
+  currentDirection: GrowthDirectionId;
+  currentDirectionChosenAt: string | null;
   currentSystem: SystemId;
   usage: DailyUsage;
   persona: PersonaArchetype | null;
