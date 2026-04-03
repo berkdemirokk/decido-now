@@ -12,6 +12,7 @@ import { RecoveryOverlay } from './src/components/RecoveryOverlay';
 import { RewardOverlay } from './src/components/RewardOverlay';
 import { ShareCard } from './src/components/ShareCard';
 import { useDecidoApp } from './src/hooks/useDecidoApp';
+import { DecisionRecord, SupportedLanguage } from './src/types';
 import { theme } from './src/theme';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { TodayScreen } from './src/screens/TodayScreen';
@@ -32,6 +33,21 @@ export default function App() {
 
   const shareHeadline = app.copy.helpers.shareHeadline(app.shareVariant);
   const shareResult = app.copy.helpers.shareResult(app.shareVariant);
+  const completedMoves = app.appData.decisions.filter(
+    (decision) => decision.reviewedAt && decision.completion === 'done'
+  );
+  const latestCompletedMove = completedMoves[0] ?? null;
+  const rewardOutcomeLine = latestCompletedMove
+    ? buildRewardOutcomeLine(latestCompletedMove, app.appData.language)
+    : null;
+  const rewardCumulativeLine = completedMoves.length
+    ? buildRewardCumulativeLine(completedMoves, app.appData.language)
+    : null;
+  const rewardMomentumLine = buildRewardMomentumLine(
+    latestCompletedMove,
+    app.streak,
+    app.appData.language
+  );
 
   useEffect(() => {
     shellOpacity.value = withTiming(app.focusRunView.visible ? 0 : 1, {
@@ -269,14 +285,16 @@ export default function App() {
 
       <RewardOverlay
         visible={Boolean(app.reward)}
+        language={app.appData.language}
+        momentumLine={rewardMomentumLine}
         xpGain={app.reward?.xpGain ?? 0}
         levelBefore={app.reward?.levelBefore ?? app.rewardProfile.level}
         levelAfter={app.reward?.levelAfter ?? app.rewardProfile.level}
         title={app.copy.reward.momentumTitle}
         message={app.reward?.message ?? app.copy.reward.momentumSaved}
-        detail={
-          app.behaviorProfile.returnPull
-        }
+        detail={app.behaviorProfile.returnPull}
+        outcomeLine={rewardOutcomeLine}
+        cumulativeLine={rewardCumulativeLine}
         buttonLabel={app.copy.reward.continue}
         onContinue={app.closeReward}
       />
@@ -437,3 +455,66 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+function buildRewardOutcomeLine(record: DecisionRecord, language: SupportedLanguage) {
+  const trackedSeconds = Math.max(record.executionSeconds ?? record.selectedSuggestion.minutes * 60, 0);
+  const duration = formatTrackedTime(trackedSeconds, language);
+
+  if (language === 'tr') {
+    return `${duration} net ilerleme • 1 hamle kapandı`;
+  }
+
+  return `${duration} locked in • 1 move closed`;
+}
+
+function buildRewardCumulativeLine(decisions: DecisionRecord[], language: SupportedLanguage) {
+  const totalSeconds = decisions.reduce(
+    (sum, decision) => sum + Math.max(decision.executionSeconds ?? decision.selectedSuggestion.minutes * 60, 0),
+    0
+  );
+  const duration = formatTrackedTime(totalSeconds, language);
+
+  if (language === 'tr') {
+    return `Toplam ${decisions.length} hamle • ${duration}`;
+  }
+
+  return `Total ${decisions.length} ${decisions.length === 1 ? 'move' : 'moves'} • ${duration}`;
+}
+
+function buildRewardMomentumLine(
+  record: DecisionRecord | null,
+  streak: number,
+  language: SupportedLanguage
+) {
+  if (record?.isRecoveryMove) {
+    return language === 'tr' ? 'Bugün geri döndün' : 'You came back today';
+  }
+
+  if (streak >= 3) {
+    return language === 'tr' ? `${streak} gündür içindesin` : `You're ${streak} days in`;
+  }
+
+  if (streak > 0) {
+    return language === 'tr' ? 'Bugün de koparmadın' : "You didn't break it today";
+  }
+
+  return null;
+}
+
+function formatTrackedTime(totalSeconds: number, language: SupportedLanguage) {
+  const minutes = Math.max(1, Math.round(totalSeconds / 60));
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (language === 'tr') {
+    if (hours > 0) {
+      return remainingMinutes > 0 ? `${hours} sa ${remainingMinutes} dk` : `${hours} sa`;
+    }
+    return `${minutes} dk`;
+  }
+
+  if (hours > 0) {
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  }
+  return `${minutes} min`;
+}

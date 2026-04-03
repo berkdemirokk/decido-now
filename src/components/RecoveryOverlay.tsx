@@ -2,6 +2,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getUiCopy } from '../lib/uiCopy';
 import { SupportedLanguage } from '../types';
+import { theme } from '../theme';
 
 interface RecoveryOverlayProps {
   visible: boolean;
@@ -51,7 +52,7 @@ export function RecoveryOverlay({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: '#0B0B0F',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 24,
     paddingVertical: 40,
   },
@@ -70,12 +71,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: theme.colors.whiteOverlay,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: theme.colors.border,
   },
   badgeText: {
-    color: 'rgba(255,255,255,0.58)',
+    color: theme.colors.textSoft,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '800',
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.3,
   },
   title: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 42,
     lineHeight: 48,
     fontWeight: '800',
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.74)',
+    color: theme.colors.textMuted,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '600',
@@ -105,17 +106,17 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 56,
     borderRadius: 20,
-    backgroundColor: '#6C5CE7',
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6C5CE7',
+    shadowColor: theme.colors.primary,
     shadowOpacity: 0.3,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 12 },
     elevation: 12,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: '700',

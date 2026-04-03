@@ -130,6 +130,12 @@ interface PaywallCopy {
   supportHard: string;
   continueCta: string;
   pressureBenefits: string[];
+  storeUnavailable: string;
+  storeLoading: string;
+  storeRetry: string;
+  storeActionFailed: string;
+  purchasePending: string;
+  restorePending: string;
 }
 
 interface OnboardingOption<T extends string> {
@@ -367,7 +373,7 @@ const englishCopy: UiCopy = {
     foundingSubline: 'One-time access with early perks',
     annualBadge: 'BEST VALUE',
     foundingBadge: 'LIMITED',
-    startTrial: 'Go Premium',
+    startTrial: 'Get Yearly Pro',
     chooseMonthly: 'Choose Monthly',
     chooseFounding: 'Choose Founding',
     restore: 'Restore Purchases',
@@ -385,13 +391,19 @@ const englishCopy: UiCopy = {
     pressureHeadline: "Don't break momentum here",
     supportSoft: 'Stop now and the next clean move gets harder.',
     supportHard: 'Stop now and the rhythm drops fast.',
-    continueCta: 'Keep Going',
+    continueCta: 'Retry Store',
     pressureBenefits: [
       'Unlimited moves',
       'Faster recovery',
       'Keep your rhythm',
       'Keep the right next move',
     ],
+    storeUnavailable: 'The App Store is not ready yet.',
+    storeLoading: 'Loading the App Store...',
+    storeRetry: 'The App Store did not respond. Retry to continue.',
+    storeActionFailed: 'The App Store action could not be completed right now. Try again.',
+    purchasePending: 'Opening secure checkout...',
+    restorePending: 'Checking your purchases...',
   },
   onboarding: {
     title: 'Stop looping. Start moving.',
@@ -667,7 +679,7 @@ const turkishCopy: UiCopy = {
     foundingSubline: 'Tek seferlik erişim ve erken ayrıcalık',
     annualBadge: 'EN İYİ DEĞER',
     foundingBadge: 'SINIRLI',
-    startTrial: 'Pro’ya Geç',
+    startTrial: "Yıllık Pro'ya Geç",
     chooseMonthly: 'Aylığı Seç',
     chooseFounding: 'Kurucu Ol',
     restore: 'Satın alımları geri yükle',
@@ -685,13 +697,19 @@ const turkishCopy: UiCopy = {
     pressureHeadline: 'Momentumu burada kırma',
     supportSoft: 'Şimdi durursan sıradaki temiz hamle zorlaşır.',
     supportHard: 'Şimdi durursan ritim hızla düşer.',
-    continueCta: 'Devam Et',
+    continueCta: 'Mağazayı Yeniden Dene',
     pressureBenefits: [
       'Sınırsız hamle',
       'Daha hızlı toparlan',
       'Ritmi koru',
       'Sıradaki doğru hamle',
     ],
+    storeUnavailable: 'App Store şu an hazır değil.',
+    storeLoading: 'App Store yükleniyor...',
+    storeRetry: 'App Store yanıt vermedi. Yeniden dene.',
+    storeActionFailed: 'App Store işlemi şu an tamamlanamadı. Yeniden dene.',
+    purchasePending: 'Güvenli ödeme açılıyor...',
+    restorePending: 'Satın alımların kontrol ediliyor...',
   },
   onboarding: {
     title: 'Dolanmayı bırak. Başla.',

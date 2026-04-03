@@ -14,7 +14,7 @@
       "backgroundColor": "#040507"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.berk.pick10",
       "appStoreUrl": "https://apps.apple.com/app/id6761344452",
       "infoPlist": {

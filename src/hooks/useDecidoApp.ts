@@ -1,4 +1,4 @@
-﻿import * as Haptics from 'expo-haptics';
+import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Platform, Share } from 'react-native';
 
@@ -14,7 +14,12 @@ import {
   applyContextAwareSuggestions,
   buildRecoveryMove,
 } from '../lib/contextEngine';
-import { getTodayKey, pickSuggestions } from '../lib/decisionEngine';
+import {
+  analyzeBehaviorSignals,
+  buildAdaptiveContextLines,
+  getTodayKey,
+  pickSuggestions,
+} from '../lib/decisionEngine';
 import {
   buildDirectionContext,
   buildDirectionModel,
@@ -362,6 +367,14 @@ export function useDecidoApp() {
     () => buildRewardProfile(appData.decisions, appData.language),
     [appData.decisions, appData.language]
   );
+  const behaviorSignals = useMemo(
+    () => analyzeBehaviorSignals(appData.decisions),
+    [appData.decisions]
+  );
+  const adaptiveContext = useMemo(
+    () => buildAdaptiveContextLines(behaviorSignals, appData.language === 'tr' ? 'tr' : 'en'),
+    [appData.language, behaviorSignals]
+  );
   const progressSummary = useMemo(
     () => buildProgressSummary(appData.decisions, appData.recovery, appData.language),
     [appData.decisions, appData.language, appData.recovery]
@@ -457,8 +470,9 @@ export function useDecidoApp() {
     return focusRun;
   }, [focusRun]);
 
-  const todayGain = guidance?.whatYouGain ?? activeMove?.reason ?? '';
-  const tomorrowGain = guidance?.continueTomorrow || projection?.teaser || '';
+  const todayGain = adaptiveContext.today ?? guidance?.whatYouGain ?? activeMove?.reason ?? '';
+  const tomorrowGain =
+    adaptiveContext.tomorrow ?? (guidance?.continueTomorrow || projection?.teaser || '');
   const tonightLine = buildTonightLine(appData.language, pending.length, progressSummary.completionRate);
   const softPaywallBody = copy.paywall.momentumAngle;
   const hardPaywallBody = copy.paywall.accessAngle;
@@ -1125,7 +1139,10 @@ export function useDecidoApp() {
       return;
     }
 
-    if (consecutiveSwaps >= 2) {
+    const adaptiveSwapPressure =
+      behaviorSignals.bucket === 'struggling' || behaviorSignals.bucket === 'comeback';
+
+    if (consecutiveSwaps >= 2 || (adaptiveSwapPressure && consecutiveSwaps >= 1)) {
       startRecoveryMove('swap-fatigue');
       return;
     }
@@ -1408,23 +1425,13 @@ export function useDecidoApp() {
     isActivationPhase: entitlements.isActivationPhase,
   });
   const storeStatusLine = billing.purchasePending
-    ? appData.language === 'tr'
-      ? 'Satin alim isleniyor...'
-      : 'Processing purchase...'
+    ? copy.paywall.purchasePending
     : billing.restorePending
-      ? appData.language === 'tr'
-        ? 'Satin alimlar geri yukleniyor...'
-        : 'Restoring purchases...'
+      ? copy.paywall.restorePending
       : billing.hasLiveStore
-        ? billing.catalogLoaded
-          ? null
-          : appData.language === 'tr'
-            ? 'Magaza baglaniyor...'
-            : 'Connecting to the store...'
+        ? null
         : Platform.OS !== 'web'
-          ? appData.language === 'tr'
-            ? 'Magaza henuz hazir degil.'
-            : 'Store is not ready yet.'
+          ? copy.paywall.storeUnavailable
           : null;
 
   return {

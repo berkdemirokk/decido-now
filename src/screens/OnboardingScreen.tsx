@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.primary,
     paddingVertical: 18,
     alignItems: 'center',
   },
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   primaryButtonText: {
-    color: '#080808',
+    color: theme.colors.text,
     fontSize: theme.typography.body,
     fontWeight: '900',
   },

@@ -2,29 +2,38 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getUiCopy } from '../lib/uiCopy';
 import { SupportedLanguage } from '../types';
+import { theme } from '../theme';
 
 interface RewardOverlayProps {
   visible: boolean;
+  language: SupportedLanguage;
+  momentumLine?: string | null;
   xpGain: number;
   levelBefore: string;
   levelAfter: string;
   title: string;
   message: string;
   detail: string;
+  outcomeLine?: string | null;
+  cumulativeLine?: string | null;
   buttonLabel: string;
   onContinue: () => void;
 }
 
 export function RewardOverlay({
   visible,
+  language,
+  momentumLine,
   title,
   message,
   detail,
+  outcomeLine,
+  cumulativeLine,
   buttonLabel,
   onContinue,
 }: RewardOverlayProps) {
-  const language = inferLanguage(title, message, detail, buttonLabel);
   const rewardCopy = getUiCopy(language).reward;
+  const continuationLine = buildContinuationLine(detail, language);
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onContinue}>
@@ -36,7 +45,12 @@ export function RewardOverlay({
             </View>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.subtitle}>{message}</Text>
-            {detail ? <Text style={styles.detail}>{detail}</Text> : null}
+            {momentumLine ? <Text style={styles.momentumLine}>{momentumLine}</Text> : null}
+            {outcomeLine ? <Text style={styles.outcomeLine}>{outcomeLine}</Text> : null}
+            {cumulativeLine ? (
+              <Text style={styles.cumulativeLine}>{cumulativeLine}</Text>
+            ) : null}
+            {continuationLine ? <Text style={styles.detail}>{continuationLine}</Text> : null}
           </View>
 
           <Pressable onPress={onContinue} style={styles.button}>
@@ -48,15 +62,25 @@ export function RewardOverlay({
   );
 }
 
-function inferLanguage(...parts: string[]): SupportedLanguage {
-  const combined = parts.join(' ');
-  return /[ğĞıİşŞçÇöÖüÜ]/.test(combined) ? 'tr' : 'en';
+function buildContinuationLine(detail: string, language: SupportedLanguage) {
+  const cleaned = detail.trim();
+
+  if (cleaned) {
+    const firstChunk = cleaned.split(/[.!?]/)[0]?.trim() ?? cleaned;
+    return firstChunk.length <= 46
+      ? firstChunk
+      : `${firstChunk.slice(0, 43).trimEnd()}...`;
+  }
+
+  return language === 'tr'
+    ? 'Yarın bu çizginin üstüne çıkarsın'
+    : 'Tomorrow, you continue this';
 }
 
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: '#0B0B0F',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 24,
     paddingVertical: 40,
   },
@@ -75,12 +99,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(0,212,255,0.1)',
+    backgroundColor: theme.colors.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(0,212,255,0.24)',
+    borderColor: theme.colors.accentGlow,
   },
   badgeText: {
-    color: '#00D4FF',
+    color: theme.colors.accent,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '800',
@@ -88,7 +112,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.3,
   },
   title: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 42,
     lineHeight: 48,
     fontWeight: '800',
@@ -98,16 +122,40 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.78)',
+    color: theme.colors.textMuted,
     fontSize: 17,
     lineHeight: 23,
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
     textAlign: 'center',
   },
+  momentumLine: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    textAlign: 'center',
+  },
+  outcomeLine: {
+    color: theme.colors.text,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    textAlign: 'center',
+  },
+  cumulativeLine: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    textAlign: 'center',
+  },
   detail: {
     maxWidth: 320,
-    color: 'rgba(255,255,255,0.44)',
+    color: theme.colors.textSoft,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '500',
@@ -118,17 +166,17 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 56,
     borderRadius: 20,
-    backgroundColor: '#6C5CE7',
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6C5CE7',
+    shadowColor: theme.colors.primary,
     shadowOpacity: 0.28,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 10 },
     elevation: 10,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: '700',

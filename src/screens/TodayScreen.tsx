@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PrimaryMoveCard } from '../components/PrimaryMoveCard';
 import { UiCopy } from '../lib/uiCopy';
 import { GrowthDirectionId, Suggestion, SupportedLanguage } from '../types';
+import { theme } from '../theme';
 
 interface TodayScreenProps {
   copy: UiCopy;
@@ -55,23 +56,40 @@ interface TodayScreenProps {
 
 export function TodayScreen({
   copy,
+  language,
   move,
   activeDirection,
+  weeklyBlueprint,
   movesLeftLabel,
+  streakLabel,
   reason,
+  todayGain,
+  tomorrowGain,
   onStart,
   onWhy,
   onSwap,
 }: TodayScreenProps) {
   const directionLine = copy.today.directionLine;
   const taskText = move?.action ?? copy.today.loadingMove;
-  const shortReason = compressReason(reason?.trim() || move?.reason || '', copy.today.defaultShortReason);
+  const shortReason = compressReason(
+    reason?.trim() || move?.reason || '',
+    copy.today.defaultShortReason
+  );
+  const momentumLine = buildCardMomentumLine(streakLabel, language);
+  const continuationLine = buildContinuationLine(
+    tomorrowGain,
+    weeklyBlueprint.progressLine,
+    language
+  );
 
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>{copy.today.screenTitle}</Text>
         <Text style={styles.subtitle}>{copy.today.screenSubtitle}</Text>
+        {continuationLine ? (
+          <Text style={styles.continuationLine}>{continuationLine}</Text>
+        ) : null}
       </View>
 
       <View style={styles.cardWrap}>
@@ -91,15 +109,16 @@ export function TodayScreen({
           }
           accentColor={activeDirection.accent}
           directionLabel={activeDirection.label}
+          momentumLine={momentumLine}
           cardTitle={directionLine}
           whyLabel=""
           impactLabel=""
           reason={shortReason}
-          todayGain=""
-          tomorrowGain=""
+          todayGain={todayGain}
+          tomorrowGain={tomorrowGain}
           primaryCta={copy.today.primaryCtaShort}
-          secondaryWhy=""
-          secondarySwap=""
+          secondaryWhy={copy.today.why}
+          secondarySwap={copy.today.swap}
           onStart={onStart}
           onWhy={onWhy}
           onSwap={onSwap}
@@ -113,10 +132,43 @@ export function TodayScreen({
   );
 }
 
+function buildCardMomentumLine(streakLabel: string, language: SupportedLanguage) {
+  const streak = Number.parseInt(streakLabel, 10);
+
+  if (!Number.isFinite(streak) || streak <= 0) {
+    return null;
+  }
+
+  if (language === 'tr') {
+    return streak >= 3 ? `${streak} gündür içindesin` : 'Bugün de koparma';
+  }
+
+  return streak >= 3 ? `You're ${streak} days in` : "Don't break it now";
+}
+
+function buildContinuationLine(
+  tomorrowGain: string,
+  progressLine: string,
+  language: SupportedLanguage
+) {
+  const source = tomorrowGain.trim() || progressLine.trim();
+
+  if (source) {
+    const firstChunk = source.split(/[.!?]/)[0]?.trim() ?? source;
+    return firstChunk.length <= 42
+      ? firstChunk
+      : `${firstChunk.slice(0, 39).trimEnd()}...`;
+  }
+
+  return language === 'tr'
+    ? 'Dün bıraktığın yerin üstüne gidiyorsun'
+    : "You're picking up where you left off";
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0B0B0F',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: 112,
@@ -126,7 +178,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   title: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 42,
     lineHeight: 48,
     fontWeight: '800',
@@ -134,11 +186,19 @@ const styles = StyleSheet.create({
     letterSpacing: -1.4,
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.62)',
+    color: theme.colors.textMuted,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '500',
     fontFamily: 'Inter_500Medium',
+  },
+  continuationLine: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    maxWidth: 300,
   },
   cardWrap: {
     flex: 1,
@@ -151,7 +211,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   footerText: {
-    color: 'rgba(255,255,255,0.42)',
+    color: theme.colors.textSoft,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '500',

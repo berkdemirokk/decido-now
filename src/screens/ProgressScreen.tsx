@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { UiCopy } from '../lib/uiCopy';
 import { DecisionRecord, InsightCard, SupportedLanguage } from '../types';
+import { theme } from '../theme';
 
 interface ProgressScreenProps {
   copy: UiCopy;
@@ -64,6 +65,7 @@ export function ProgressScreen({
   copy,
   language,
   directionLabel,
+  momentumLine,
   dnaCards,
   dnaLockedCount,
   recent,
@@ -73,20 +75,42 @@ export function ProgressScreen({
 }: ProgressScreenProps) {
   const tacticalInsight = progressSummary.insights[0];
   const deepInsight = dnaCards[0];
-  const identityLine = copy.progress.identityLine(behaviorProfile.executionScore);
+  const signalLabels = getSignalLabels(language);
+  const signalRows = [
+    {
+      label: signalLabels.consistency,
+      value: `${progressSummary.completionRate}%`,
+      hint: signalLabels.closeRate,
+    },
+    {
+      label: signalLabels.accumulation,
+      value: `${progressSummary.completedThisWeek}`,
+      hint: signalLabels.movesThisWeek,
+    },
+    {
+      label: signalLabels.improvement,
+      value: progressSummary.bestWindow,
+      hint: signalLabels.bestWindow,
+    },
+  ];
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>{directionLabel}</Text>
         <Text style={styles.title}>{behaviorProfile.identityTitle}</Text>
-        <Text style={styles.heroBody}>{identityLine}</Text>
+        <Text style={styles.heroBody}>{momentumLine}</Text>
       </View>
 
       <View style={styles.scoreBlock}>
-        <ScoreColumn label={copy.progress.execution} value={behaviorProfile.executionScore} />
-        <ScoreColumn label={copy.progress.stability} value={behaviorProfile.stabilityScore} />
-        <ScoreColumn label={copy.progress.drift} value={behaviorProfile.driftScore} negative />
+        {signalRows.map((signal) => (
+          <SignalColumn
+            key={signal.label}
+            label={signal.label}
+            value={signal.value}
+            hint={signal.hint}
+          />
+        ))}
       </View>
 
       <View style={styles.adjustmentBlock}>
@@ -130,21 +154,44 @@ export function ProgressScreen({
   );
 }
 
-function ScoreColumn({
+function SignalColumn({
   label,
   value,
-  negative = false,
+  hint,
 }: {
   label: string;
-  value: number;
-  negative?: boolean;
+  value: string;
+  hint: string;
 }) {
   return (
     <View style={styles.scoreColumn}>
       <Text style={styles.scoreLabel}>{label}</Text>
-      <Text style={[styles.scoreValue, negative ? styles.scoreValueNegative : null]}>{value}</Text>
+      <Text style={styles.scoreValue}>{value}</Text>
+      <Text style={styles.scoreHint}>{hint}</Text>
     </View>
   );
+}
+
+function getSignalLabels(language: SupportedLanguage) {
+  if (language === 'tr') {
+    return {
+      consistency: 'Tutarlılık',
+      accumulation: 'Birikim',
+      improvement: 'İyileşme',
+      closeRate: 'kapanış oranı',
+      movesThisWeek: 'bu hafta',
+      bestWindow: 'en temiz pencere',
+    };
+  }
+
+  return {
+    consistency: 'Consistency',
+    accumulation: 'Accumulation',
+    improvement: 'Improvement',
+    closeRate: 'close rate',
+    movesThisWeek: 'this week',
+    bestWindow: 'best window',
+  };
 }
 
 function formatMoveDate(record: DecisionRecord, language: SupportedLanguage) {
@@ -161,13 +208,13 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 132,
     gap: 28,
-    backgroundColor: '#0B0B0F',
+    backgroundColor: theme.colors.background,
   },
   hero: {
     gap: 10,
   },
   eyebrow: {
-    color: 'rgba(255,255,255,0.48)',
+    color: theme.colors.textSoft,
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '600',
@@ -176,7 +223,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   title: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 34,
     lineHeight: 40,
     fontWeight: '800',
@@ -184,7 +231,7 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   heroBody: {
-    color: 'rgba(255,255,255,0.72)',
+    color: theme.colors.textMuted,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '500',
@@ -193,21 +240,21 @@ const styles = StyleSheet.create({
   },
   scoreBlock: {
     borderRadius: 20,
-    backgroundColor: '#15151C',
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: theme.colors.border,
   },
   scoreColumn: {
     flex: 1,
     gap: 6,
   },
   scoreLabel: {
-    color: 'rgba(255,255,255,0.52)',
+    color: theme.colors.textSoft,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '600',
@@ -216,21 +263,27 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   scoreValue: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    lineHeight: 38,
+    color: theme.colors.text,
+    fontSize: 28,
+    lineHeight: 32,
     fontWeight: '800',
     fontFamily: 'Inter_700Bold',
     letterSpacing: -1,
   },
-  scoreValueNegative: {
-    color: 'rgba(255,255,255,0.78)',
+  scoreHint: {
+    color: theme.colors.textSoft,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
   },
   adjustmentBlock: {
     gap: 10,
   },
   sectionLabel: {
-    color: 'rgba(255,255,255,0.44)',
+    color: theme.colors.textSoft,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '700',
@@ -238,14 +291,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   adjustmentTitle: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '700',
     fontFamily: 'Inter_700Bold',
   },
   adjustmentBody: {
-    color: 'rgba(255,255,255,0.68)',
+    color: theme.colors.textMuted,
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '500',
@@ -259,11 +312,11 @@ const styles = StyleSheet.create({
   supportRow: {
     gap: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: theme.colors.border,
     paddingTop: 18,
   },
   supportLabel: {
-    color: 'rgba(255,255,255,0.42)',
+    color: theme.colors.textSoft,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '800',
@@ -271,14 +324,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   supportTitle: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
   },
   supportBody: {
-    color: 'rgba(255,255,255,0.58)',
+    color: theme.colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '500',
@@ -290,19 +343,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: theme.colors.border,
     paddingTop: 14,
   },
   moveTitle: {
     flex: 1,
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 15,
     lineHeight: 20,
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
   },
   moveDate: {
-    color: 'rgba(255,255,255,0.48)',
+    color: theme.colors.textSoft,
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '500',

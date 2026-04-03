@@ -13,6 +13,7 @@ import Animated, {
 
 import { UiCopy } from '../lib/uiCopy';
 import { Suggestion, SupportedLanguage } from '../types';
+import { theme } from '../theme';
 
 export interface FocusRunViewModel {
   visible: boolean;
@@ -245,7 +246,7 @@ function formatTimer(totalSeconds: number) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0B0B0F',
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 24,
     paddingTop: 32,
     paddingBottom: 40,
@@ -253,7 +254,7 @@ const styles = StyleSheet.create({
   },
   flashOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.text,
   },
   header: {
     alignItems: 'center',
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   title: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: '700',
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   subtitle: {
-    color: 'rgba(255,255,255,0.62)',
+    color: theme.colors.textMuted,
     fontSize: 13,
     lineHeight: 17,
     fontWeight: '500',
@@ -283,7 +284,7 @@ const styles = StyleSheet.create({
   },
   moveLabel: {
     maxWidth: 300,
-    color: 'rgba(255,255,255,0.46)',
+    color: theme.colors.textSoft,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '600',
@@ -305,9 +306,9 @@ const styles = StyleSheet.create({
     height: 252,
     borderRadius: 126,
     borderWidth: 1,
-    borderColor: 'rgba(108,92,231,0.2)',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    shadowColor: '#6C5CE7',
+    borderColor: theme.colors.primaryGlow,
+    backgroundColor: theme.colors.whiteOverlay,
+    shadowColor: theme.colors.primary,
     shadowOpacity: 0.22,
     shadowRadius: 34,
     shadowOffset: { width: 0, height: 0 },
@@ -319,12 +320,12 @@ const styles = StyleSheet.create({
     borderRadius: 110,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(21,21,28,0.88)',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: theme.colors.border,
   },
   timer: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 100,
     lineHeight: 104,
     fontWeight: '800',
@@ -334,7 +335,7 @@ const styles = StyleSheet.create({
   },
   stepLine: {
     maxWidth: 290,
-    color: 'rgba(255,255,255,0.82)',
+    color: theme.colors.text,
     fontSize: 17,
     lineHeight: 24,
     fontWeight: '600',
@@ -356,17 +357,17 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 58,
     borderRadius: 20,
-    backgroundColor: '#6C5CE7',
+    backgroundColor: theme.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6C5CE7',
+    shadowColor: theme.colors.primary,
     shadowOpacity: 0.3,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 12 },
     elevation: 12,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: '700',
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   tertiaryButtonText: {
-    color: 'rgba(255,255,255,0.42)',
+    color: theme.colors.textSoft,
     fontSize: 13,
     lineHeight: 17,
     fontWeight: '500',
@@ -390,14 +391,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   leaveButtonText: {
-    color: 'rgba(255,255,255,0.38)',
+    color: theme.colors.textSoft,
     fontSize: 13,
     lineHeight: 17,
     fontWeight: '500',
     fontFamily: 'Inter_500Medium',
   },
   scorePrompt: {
-    color: 'rgba(255,255,255,0.72)',
+    color: theme.colors.textMuted,
     fontSize: 15,
     lineHeight: 20,
     fontWeight: '500',
@@ -413,12 +414,12 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     borderRadius: 16,
-    backgroundColor: '#15151C',
+    backgroundColor: theme.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scoreChipText: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: '700',
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
@@ -434,14 +435,14 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     borderRadius: 20,
-    backgroundColor: '#15151C',
+    backgroundColor: theme.colors.surface,
     padding: 24,
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: theme.colors.border,
   },
   modalTitle: {
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '700',
@@ -455,7 +456,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalSecondaryText: {
-    color: 'rgba(255,255,255,0.58)',
+    color: theme.colors.textMuted,
     fontSize: 15,
     lineHeight: 20,
     fontWeight: '600',

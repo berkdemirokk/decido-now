@@ -17,7 +17,7 @@ export function createDefaultAppData(now = new Date()): AppData {
       used: 0,
     },
     devPlanPreview: 'free',
-    language: 'tr',
+    language: 'en',
     subscription: {
       plan: 'free',
       productId: null,

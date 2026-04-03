@@ -1,7 +1,19 @@
 import { useEffect } from 'react';
 import { BlurView } from 'expo-blur';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { FutureProjection } from '../lib/futureProjection';
 import { GuidancePack } from '../lib/guidance';
@@ -55,7 +67,10 @@ export function GuidanceSheet({
     <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Animated.View style={[styles.sheet, animatedStyle]}>
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.handle} />
 
             <View style={styles.hero}>
@@ -72,7 +87,10 @@ export function GuidanceSheet({
               <>
                 <BriefRow label={copy.guidance.whyFits} body={guidance.whyFits} />
                 <BriefList label={copy.guidance.howToStart} items={guidance.steps} />
-                <BriefRow label={copy.guidance.todayGain} body={guidance.whatYouGain} />
+                <BriefRow
+                  label={copy.guidance.todayGain}
+                  body={guidance.whatYouGain}
+                />
 
                 {guidanceTier === 'full' ? (
                   <>
@@ -87,7 +105,13 @@ export function GuidanceSheet({
                     <BriefRow
                       label={copy.guidance.projection}
                       body={guidance.continueTomorrow}
-                      hint={projection ? (lockedProjection ? projection.teaser : projection.positive) : undefined}
+                      hint={
+                        projection
+                          ? lockedProjection
+                            ? projection.teaser
+                            : projection.positive
+                          : undefined
+                      }
                     />
                   </>
                 ) : (
@@ -126,7 +150,15 @@ export function GuidanceSheet({
   );
 }
 
-function BriefRow({ label, body, hint }: { label: string; body: string; hint?: string }) {
+function BriefRow({
+  label,
+  body,
+  hint,
+}: {
+  label: string;
+  body: string;
+  hint?: string;
+}) {
   return (
     <View style={styles.rowBlock}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -236,7 +268,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.borderStrong,
     padding: theme.spacing.md,
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: theme.colors.whiteOverlay,
   },
   lockedLabel: {
     color: theme.colors.accent,
@@ -252,13 +284,13 @@ const styles = StyleSheet.create({
   upgradeButton: {
     alignSelf: 'flex-start',
     borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 10,
     marginTop: 4,
   },
   upgradeText: {
-    color: '#080808',
+    color: theme.colors.text,
     fontSize: theme.typography.body,
     fontWeight: '800',
   },
@@ -270,12 +302,12 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.primary,
     paddingVertical: 16,
     alignItems: 'center',
   },
   primaryText: {
-    color: '#080808',
+    color: theme.colors.text,
     fontSize: theme.typography.body,
     fontWeight: '900',
   },
@@ -285,7 +317,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.borderStrong,
     paddingVertical: 15,
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: theme.colors.whiteOverlay,
   },
   secondaryText: {
     color: theme.colors.text,

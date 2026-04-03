@@ -1,4 +1,4 @@
-import { DAILY_SPARKS, SUGGESTIONS } from '../data/suggestions';
+﻿import { DAILY_SPARKS, SUGGESTIONS } from '../data/suggestions';
 import {
   BudgetTier,
   Category,
@@ -100,6 +100,19 @@ const budgetRank: Record<BudgetTier, number> = {
 const recentPenaltyWindow = 12;
 const recentCategoryWindow = 6;
 
+export interface BehaviorSignals {
+  completionRate: number;
+  swapRate: number;
+  missedDays: number;
+  streak: number;
+  bucket: 'comeback' | 'struggling' | 'steady' | 'consistent';
+}
+
+export interface AdaptiveContextLines {
+  today: string | null;
+  tomorrow: string | null;
+}
+
 export function getTodayKey(date = new Date()) {
   return toLocalDateKey(date);
 }
@@ -140,6 +153,7 @@ export function pickSuggestions(context: DecisionContext, decisions: DecisionRec
   const reviewed = decisions.filter((decision) => decision.reviewedAt);
   const learning = buildLearningModel(reviewed);
   const failureModel = buildFailureModel(reviewed);
+  const behaviorSignals = analyzeBehaviorSignals(decisions);
   const currentDaypart = getDaypartKey(new Date().getHours());
 
   const ranked = SUGGESTIONS.map((suggestion) => ({
@@ -151,6 +165,7 @@ export function pickSuggestions(context: DecisionContext, decisions: DecisionRec
       recentCategories,
       learning,
       failureModel,
+      behaviorSignals,
       currentDaypart
     ),
   }))
@@ -189,6 +204,94 @@ export function pickSuggestions(context: DecisionContext, decisions: DecisionRec
   return diversifyPicks(finalPicks, reviewed);
 }
 
+export function analyzeBehaviorSignals(
+  decisions: DecisionRecord[],
+  today = new Date()
+): BehaviorSignals {
+  const reviewed = decisions.filter((decision) => decision.reviewedAt).slice(0, 12);
+  const done = reviewed.filter((decision) => decision.completion === 'done');
+  const swapped = reviewed.filter((decision) => (decision.swapCountBeforeSelection ?? 0) > 0);
+  const latest = reviewed[0] ?? null;
+  const completionRate = reviewed.length ? done.length / reviewed.length : 0;
+  const swapRate = reviewed.length ? swapped.length / reviewed.length : 0;
+
+  const doneDateKeys = Array.from(
+    new Set(decisions.filter((decision) => decision.completion === 'done').map((decision) => decision.dateKey))
+  );
+  const doneSet = new Set(doneDateKeys);
+  const streak = computeDoneStreak(doneSet, today);
+  const latestDoneDateKey = doneDateKeys.sort().reverse()[0] ?? null;
+  const missedDays = latestDoneDateKey ? Math.max(0, diffDateKeys(latestDoneDateKey, getTodayKey(today)) - 1) : 0;
+
+  const bucket =
+    missedDays >= 1 ||
+    (latest && (latest.focusRunOutcome === 'abandoned' || latest.completion === 'skipped'))
+      ? 'comeback'
+      : completionRate <= 0.45 || swapRate >= 0.5
+        ? 'struggling'
+        : streak >= 3 || (reviewed.length >= 4 && completionRate >= 0.75)
+          ? 'consistent'
+          : 'steady';
+
+  return {
+    completionRate: Math.round(completionRate * 100),
+    swapRate: Math.round(swapRate * 100),
+    missedDays,
+    streak,
+    bucket,
+  };
+}
+
+export function buildAdaptiveContextLines(
+  signals: BehaviorSignals,
+  language: 'tr' | 'en'
+): AdaptiveContextLines {
+  if (language === 'tr') {
+    const trLines: Record<BehaviorSignals['bucket'], AdaptiveContextLines> = {
+      comeback: {
+        today: 'Bugün mesele geri giriş.',
+        tomorrow: 'Bugün dönersen yarın sıfırdan başlamaz.',
+      },
+      struggling: {
+        today: 'Küçük ama net kapanış ritmi toplar.',
+        tomorrow: 'Tek temiz kapanış yarını hafifletir.',
+      },
+      consistent: {
+        today: 'Bugün biraz daha ağır taşıyabilirsin.',
+        tomorrow: 'Bugün kapatırsan yarın bunun üstüne çıkarsın.',
+      },
+      steady: {
+        today: null,
+        tomorrow: null,
+      },
+    };
+
+    return trLines[signals.bucket];
+  }
+
+  switch (signals.bucket) {
+    case 'comeback':
+      return {
+        today: 'Today is about re-entry.',
+        tomorrow: "Come back today and tomorrow won't restart.",
+      };
+    case 'struggling':
+      return {
+        today: 'Keep it small. Clean closes restore rhythm.',
+        tomorrow: 'One clean close today makes tomorrow lighter.',
+      };
+    case 'consistent':
+      return {
+        today: 'You can carry a little more weight today.',
+        tomorrow: 'Close this today and tomorrow builds on it.',
+      };
+    default:
+      return {
+        today: null,
+        tomorrow: null,
+      };
+  }
+}
 function scoreSuggestion(
   suggestion: Suggestion,
   context: DecisionContext,
@@ -196,6 +299,7 @@ function scoreSuggestion(
   recentCategories: Category[],
   learning: LearningModel,
   failureModel: FailureModel,
+  behaviorSignals: BehaviorSignals,
   currentDaypart: string
 ) {
   let score = 0;
@@ -291,6 +395,8 @@ function scoreSuggestion(
   if (failureModel.categorySuccess[suggestion.category] >= 2) {
     score += 1.1;
   }
+
+  score += getBehaviorAdjustment(suggestion, behaviorSignals);
 
   return score;
 }
@@ -595,4 +701,60 @@ function computeFreshnessBonus(suggestion: Suggestion, reviewed: DecisionRecord[
   if (lastSeenIndex === -1) return 3;
   if (lastSeenIndex > 6) return 1.5;
   return 0;
+}
+
+function getBehaviorAdjustment(suggestion: Suggestion, signals: BehaviorSignals) {
+  switch (signals.bucket) {
+    case 'comeback': {
+      let score = 0;
+      if (suggestion.minutes <= 10) score += 4;
+      if (['reset', 'health', 'focus'].includes(suggestion.category)) score += 3.2;
+      if (suggestion.preferredModes.includes('reset') || suggestion.preferredModes.includes('quick-win')) score += 2.4;
+      if (suggestion.minutes > 15) score -= 4.4;
+      if (suggestion.preferredModes.includes('bold')) score -= 1.4;
+      return score;
+    }
+    case 'struggling': {
+      let score = 0;
+      if (suggestion.minutes <= 10) score += 3.2;
+      if (suggestion.preferredModes.includes('quick-win') || suggestion.preferredModes.includes('reset')) score += 1.8;
+      if (suggestion.minutes > 20) score -= 3.2;
+      if (suggestion.preferredModes.includes('deep-focus') || suggestion.preferredModes.includes('bold')) score -= 1.2;
+      return score;
+    }
+    case 'consistent': {
+      let score = 0;
+      if (suggestion.minutes >= 15) score += 2.6;
+      if (suggestion.preferredModes.includes('deep-focus') || suggestion.preferredModes.includes('bold')) score += 1.9;
+      if (suggestion.minutes <= 5) score -= 1.3;
+      if (suggestion.category === 'reset') score -= 0.8;
+      return score;
+    }
+    default:
+      return 0;
+  }
+}
+
+function computeDoneStreak(doneSet: Set<string>, today = new Date()) {
+  let count = 0;
+  const cursor = new Date(today);
+
+  while (true) {
+    const key = getTodayKey(cursor);
+    if (!doneSet.has(key)) {
+      break;
+    }
+
+    count += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return count;
+}
+
+function diffDateKeys(left: string, right: string) {
+  const leftDate = new Date(`${left}T00:00:00`);
+  const rightDate = new Date(`${right}T00:00:00`);
+  const diff = rightDate.getTime() - leftDate.getTime();
+  return Math.round(diff / (1000 * 60 * 60 * 24));
 }

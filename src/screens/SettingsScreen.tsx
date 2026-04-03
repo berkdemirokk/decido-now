@@ -54,10 +54,26 @@ export function SettingsScreen({
         <Text style={styles.planPill}>{planLabel}</Text>
       </Pressable>
 
-      <SettingsRow label={copy.settings.language} value={language.toUpperCase()} onPress={onLanguage} />
-      <SettingsRow label={copy.settings.restore} value="App Store" onPress={onRestore} />
-      <SettingsRow label={copy.settings.manage} value={planLabel} onPress={onManage} />
-      <SettingsRow label={copy.settings.gift} value={isTurkish ? '1 açılım' : '1 unlock'} onPress={onGiftMove} />
+      <SettingsRow
+        label={copy.settings.language}
+        value={language.toUpperCase()}
+        onPress={onLanguage}
+      />
+      <SettingsRow
+        label={copy.settings.restore}
+        value="App Store"
+        onPress={onRestore}
+      />
+      <SettingsRow
+        label={copy.settings.manage}
+        value={planLabel}
+        onPress={onManage}
+      />
+      <SettingsRow
+        label={copy.settings.gift}
+        value={isTurkish ? '1 açılım' : '1 unlock'}
+        onPress={onGiftMove}
+      />
 
       <View style={styles.infoBlock}>
         <Text style={styles.infoLabel}>{copy.settings.disclaimer}</Text>
@@ -103,7 +119,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: theme.colors.whiteOverlay,
     padding: theme.spacing.lg,
   },
   heroCopy: {
@@ -137,7 +153,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: theme.colors.whiteOverlay,
   },
   row: {
     flexDirection: 'row',
